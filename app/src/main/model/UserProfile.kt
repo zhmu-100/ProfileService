@@ -19,7 +19,7 @@ data class Location(
 )
 
 data class Date(
-    val year: number,
-    val month: number,
-    val day: number,
+    val year: Int,
+    val month: Int,
+    val day: Int,
 )
