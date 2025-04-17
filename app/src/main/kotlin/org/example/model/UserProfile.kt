@@ -1,4 +1,4 @@
-package src.main.model
+package org.example.model
 
 data class UserProfile(
     val ID: Int,
