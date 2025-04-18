@@ -10,11 +10,23 @@ import java.util.UUID
 
 private val logger = KotlinLogging.logger {}
 
+/**
+ * Реализация сервиса для работы с профилями пользователей и подписками.
+ *
+ * @property profileRepository репозиторий для работы с профилями пользователей
+ * @property followerRepository репозиторий для работы с подписками пользователей
+ */
 class ProfileServiceImpl(
     private val profileRepository: ProfileRepository,
     private val followerRepository: FollowerRepository
 ) : ProfileService {
-    
+
+    /**
+     * Создает новый профиль пользователя.
+     * @param profile Данные для создания профиля
+     * @return Созданный профиль [ProfileResponse]. Если профиль с таким email уже существует,
+     *         возвращает существующий профиль.
+     */
     override suspend fun createProfile(profile: ProfileRequest): ProfileResponse {
         logger.info { "Creating profile for ${profile.email}" }
     
@@ -30,8 +42,12 @@ class ProfileServiceImpl(
         val created = profileRepository.create(profile)
         return created.toResponse(0, 0)
     }
-    
-    
+
+    /**
+     * Получает профиль пользователя по ID.
+     * @param id UUID идентификатор пользователя
+     * @return Профиль [ProfileResponse] или null, если не найден
+     */
     override suspend fun getProfile(id: UUID): ProfileResponse? {
         logger.info { "Getting profile with ID: $id" }
         
@@ -42,6 +58,12 @@ class ProfileServiceImpl(
         return profile.toResponse(followerCount, followingCount)
     }
 
+    /**
+     * Получает список профилей с пагинацией.
+     * @param page Номер страницы (начиная с 0)
+     * @param pageSize Количество элементов на странице
+     * @return Ответ со списком профилей [ProfilesResponse]
+     */
     override suspend fun listProfiles(page: Int, pageSize: Int): ProfilesResponse {
         logger.info { "Listing profiles: page=$page, pageSize=$pageSize" }
         
@@ -61,6 +83,12 @@ class ProfileServiceImpl(
         )
     }
 
+    /**
+     * Обновляет данные профиля пользователя.
+     * @param id UUID идентификатор пользователя
+     * @param profile Новые данные профиля
+     * @return Обновленный профиль [ProfileResponse] или null, если профиль не найден
+     */
     override suspend fun updateProfile(id: UUID, profile: ProfileRequest): ProfileResponse? {
         logger.info { "Updating profile with ID: $id" }
         
@@ -71,12 +99,23 @@ class ProfileServiceImpl(
         return updatedProfile.toResponse(followerCount, followingCount)
     }
 
+    /**
+     * Удаляет профиль пользователя.
+     * @param id UUID идентификатор пользователя
+     * @return true если удаление прошло успешно, false в противном случае
+     */
     override suspend fun deleteProfile(id: UUID): Boolean {
         logger.info { "Deleting profile with ID: $id" }
         
         return profileRepository.delete(id)
     }
 
+    /**
+     * Оформляет подписку одного пользователя на другого.
+     * @param followerId UUID идентификатор подписчика
+     * @param followeeId UUID идентификатор того, на кого подписываются
+     * @return true если подписка оформлена успешно, false если один из пользователей не существует
+     */
     override suspend fun follow(followerId: UUID, followeeId: UUID): Boolean {
         logger.info { "User $followerId is following user $followeeId" }
         
@@ -91,12 +130,25 @@ class ProfileServiceImpl(
         return followerRepository.follow(followerId, followeeId)
     }
 
+    /**
+     * Отменяет подписку одного пользователя на другого.
+     * @param followerId UUID идентификатор подписчика
+     * @param followeeId UUID идентификатор того, на кого была подписка
+     * @return true если отписка прошла успешно, false в противном случае
+     */
     override suspend fun unfollow(followerId: UUID, followeeId: UUID): Boolean {
         logger.info { "User $followerId is unfollowing user $followeeId" }
         
         return followerRepository.unfollow(followerId, followeeId)
     }
 
+    /**
+     * Получает список подписчиков пользователя с пагинацией.
+     * @param userId UUID идентификатор пользователя
+     * @param page Номер страницы (начиная с 0)
+     * @param pageSize Количество элементов на странице
+     * @return Ответ со списком подписчиков [FollowersResponse]
+     */
     override suspend fun listFollowers(userId: UUID, page: Int, pageSize: Int): FollowersResponse {
         logger.info { "Listing followers for user $userId: page=$page, pageSize=$pageSize" }
         
@@ -110,6 +162,13 @@ class ProfileServiceImpl(
         )
     }
 
+    /**
+     * Получает список подписок пользователя с пагинацией.
+     * @param userId UUID идентификатор пользователя
+     * @param page Номер страницы (начиная с 0)
+     * @param pageSize Количество элементов на странице
+     * @return Ответ со списком подписок [FollowingResponse]
+     */
     override suspend fun listFollowing(userId: UUID, page: Int, pageSize: Int): FollowingResponse {
         logger.info { "Listing following for user $userId: page=$page, pageSize=$pageSize" }
         

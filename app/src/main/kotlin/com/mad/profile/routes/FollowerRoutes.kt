@@ -14,13 +14,33 @@ import java.util.*
 
 private val logger = KotlinLogging.logger {}
 
-// Эта функция теперь безопасно регистрируется через Routing
+/**
+ * Конфигурация маршрутов для работы с подписками пользователей.
+ *
+ * Регистрирует следующие endpoints:
+ * - POST /api/profiles/{id}/follow - подписаться на пользователя
+ * - POST /api/profiles/{id}/unfollow - отписаться от пользователя
+ * - GET /api/profiles/{id}/followers - получить список подписчиков
+ * - GET /api/profiles/{id}/following - получить список подписок
+ *
+ * Все маршруты включают валидацию входных данных и обработку ошибок.
+ */
 fun Routing.configureFollowerRoutes() {
     val profileService by inject<ProfileService>()
 
     route("/api/profiles") {
 
-        // Follow a user
+        /**
+         * Подписаться на пользователя.
+         *
+         * @param id UUID пользователя, на которого подписываются (в пути)
+         * @param followerId UUID подписчика (в теле запроса)
+         *
+         * Возможные ответы:
+         * - 204 No Content: подписка успешно оформлена
+         * - 400 Bad Request: неверный формат UUID или ошибка подписки
+         * - 500 Internal Server Error: серверная ошибка
+         */
         post("/{id}/follow") {
             try {
                 val followeeId = call.parameters["id"]?.let {
@@ -64,7 +84,21 @@ fun Routing.configureFollowerRoutes() {
             }
         }
 
-        // Unfollow a user
+        /**
+         * Отписаться от пользователя.
+         *
+         * @param id UUID пользователя, от которого отписываются (в пути)
+         * @param followerId UUID отписывающегося (в теле запроса)
+         * @param followeeId UUID пользователя, от которого отписываются (в теле запроса)
+         *
+         * Особенности:
+         * - Проверяет соответствие followeeId из пути и тела запроса
+         *
+         * Возможные ответы:
+         * - 204 No Content: отписка успешно выполнена
+         * - 400 Bad Request: неверный формат UUID или несоответствие ID
+         * - 500 Internal Server Error: серверная ошибка
+         */
         post("/{id}/unfollow") {
             try {
                 val followeeIdFromUrl = call.parameters["id"]?.let {
@@ -118,9 +152,19 @@ fun Routing.configureFollowerRoutes() {
                 )
             }
         }
-        
 
-        // List followers
+        /**
+         * Получить список подписчиков пользователя.
+         *
+         * @param id UUID пользователя
+         * @param page Номер страницы (по умолчанию 1)
+         * @param pageSize Размер страницы (по умолчанию 10, максимум 100)
+         *
+         * Возможные ответы:
+         * - 200 OK: список подписчиков
+         * - 400 Bad Request: неверный формат UUID или параметров пагинации
+         * - 500 Internal Server Error: серверная ошибка
+         */
         get("/{id}/followers") {
             try {
                 val userId = call.parameters["id"]?.let {
@@ -157,7 +201,18 @@ fun Routing.configureFollowerRoutes() {
             }
         }
 
-        // List following
+        /**
+         * Получить список подписок пользователя.
+         *
+         * @param id UUID пользователя
+         * @param page Номер страницы (по умолчанию 1)
+         * @param pageSize Размер страницы (по умолчанию 10, максимум 100)
+         *
+         * Возможные ответы:
+         * - 200 OK: список подписок
+         * - 400 Bad Request: неверный формат UUID или параметров пагинации
+         * - 500 Internal Server Error: серверная ошибка
+         */
         get("/{id}/following") {
             try {
                 val userId = call.parameters["id"]?.let {
