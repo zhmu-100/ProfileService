@@ -17,21 +17,44 @@ import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger {}
 
+/**
+ * Точка входа в приложение Profile Service.
+ * Запускает встроенный Netty сервер с конфигурацией из [AppConfig].
+ *
+ * @see AppConfig конфигурация хоста и порта сервера
+ */
 fun main() {
     embeddedServer(Netty, port = AppConfig.Server.port, host = AppConfig.Server.host) {
         configureServer()
     }.start(wait = true)
 }
 
+/**
+ * Конфигурирует Ktor приложение для Profile Service.
+ *
+ * Выполняет следующие настройки:
+ * 1. Настраивает dependency injection через Koin
+ * 2. Конфигурирует подключение к базам данных
+ * 3. Устанавливает ContentNegotiation для JSON сериализации
+ * 4. Настраивает CORS политику
+ * 5. Регистрирует все маршруты приложения
+ */
 fun Application.configureServer() {
     logger.info { "Starting Profile Service..." }
-    
-    // Configure Koin for dependency injection
+
+    /** Настраивает Koin для dependency injection */
     configureKoin()
-    
+
+    /** Конфигурирует подключения к базам данных */
     configureDatabases()
-    
-    // Configure content negotiation with JSON
+
+    /**
+     * Настраивает контент-негосиацию для JSON.
+     * Устанавливает следующие параметры:
+     * - prettyPrint: форматированный вывод JSON
+     * - isLenient: разрешает нестрогий синтаксис JSON
+     * - ignoreUnknownKeys: игнорирует неизвестные ключи при десериализации
+     */
     install(ContentNegotiation) {
         json(Json {
             prettyPrint = true
@@ -39,8 +62,11 @@ fun Application.configureServer() {
             ignoreUnknownKeys = true
         })
     }
-    
-    // Configure CORS
+
+    /**
+     * Настраивает CORS политику для всех хостов.
+     * Разрешает стандартные HTTP методы и заголовки.
+     */
     install(CORS) {
         anyHost()
         allowHeader("Content-Type")
@@ -51,8 +77,11 @@ fun Application.configureServer() {
         allowMethod(io.ktor.http.HttpMethod.Put)
         allowMethod(io.ktor.http.HttpMethod.Delete)
     }
-    
-    // Configure routes
+
+    /**
+     * Регистрирует все маршруты приложения.
+     * Включает маршруты для работы с профилями и подписчиками.
+     */
     routing {
         configureProfileRoutes()
         configureFollowerRoutes()
