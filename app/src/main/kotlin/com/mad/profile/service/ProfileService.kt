@@ -1,83 +1,52 @@
 package com.mad.profile.service
 
+import com.mad.profile.actions.IFollowerAction
+import com.mad.profile.actions.IProfileAction
 import com.mad.profile.model.*
 import java.util.UUID
 
 /**
- * Сервис для работы с профилями пользователей и подписками.
+ * Реализация сервиса для работы с профилями пользователей и подписками.
  *
- * Предоставляет CRUD операции для профилей, а также функционал подписок/отписок
- * и получения списков подписчиков/подписок.
+ * @property profileRepository репозиторий для работы с профилями пользователей
+ * @property followerRepository репозиторий для работы с подписками пользователей
  */
-interface ProfileService {
-    /**
-     * Создает новый профиль пользователя.
-     * @param profile Данные для создания профиля
-     * @return Созданный профиль в формате [ProfileResponse]
-     */
-    suspend fun createProfile(profile: ProfileRequest): ProfileResponse
+class ProfileService(
+    private val profileAction: IProfileAction,
+    private val followerAction: IFollowerAction
+) {
+  suspend fun createProfile(req: ProfileRequest): ProfileResponse {
+    val existing = profileAction.getByEmail(req.email)
+    return existing ?: profileAction.createProfile(req)
+  }
 
-    /**
-     * Получает профиль пользователя по идентификатору.
-     * @param id UUID идентификатор пользователя
-     * @return Профиль в формате [ProfileResponse] или null, если не найден
-     */
-    suspend fun getProfile(id: UUID): ProfileResponse?
+  suspend fun getProfile(id: UUID): ProfileResponse? = profileAction.getById(id)
 
-    /**
-     * Получает список профилей с пагинацией.
-     * @param page Номер страницы (начиная с 0)
-     * @param pageSize Количество элементов на странице
-     * @return Ответ со списком профилей [ProfilesResponse]
-     */
-    suspend fun listProfiles(page: Int, pageSize: Int): ProfilesResponse
+  suspend fun listProfiles(page: Int, pageSize: Int): ProfilesResponse {
+    val (list, total) = profileAction.list(page, pageSize)
+    return ProfilesResponse(list, page, pageSize, total)
+  }
 
-    /**
-     * Обновляет данные профиля пользователя.
-     * @param id UUID идентификатор пользователя
-     * @param profile Новые данные профиля
-     * @return Обновленный профиль [ProfileResponse] или null, если профиль не найден
-     */
-    suspend fun updateProfile(id: UUID, profile: ProfileRequest): ProfileResponse?
+  suspend fun updateProfile(id: UUID, req: ProfileRequest): ProfileResponse? =
+      profileAction.update(id, req)
 
-    /**
-     * Удаляет профиль пользователя.
-     * @param id UUID идентификатор пользователя
-     * @return true если удаление прошло успешно, false в противном случае
-     */
-    suspend fun deleteProfile(id: UUID): Boolean
+  suspend fun deleteProfile(id: UUID): Boolean = profileAction.delete(id)
 
-    /**
-     * Оформляет подписку одного пользователя на другого.
-     * @param followerId UUID идентификатор подписчика
-     * @param followeeId UUID идентификатор того, на кого подписываются
-     * @return true если подписка оформлена успешно, false в противном случае
-     */
-    suspend fun follow(followerId: UUID, followeeId: UUID): Boolean
+  suspend fun follow(followerId: UUID, followeeId: UUID): Boolean =
+      followerAction.follow(followerId, followeeId)
 
-    /**
-     * Отменяет подписку одного пользователя на другого.
-     * @param followerId UUID идентификатор подписчика
-     * @param followeeId UUID идентификатор того, на кого была подписка
-     * @return true если отписка прошла успешно, false в противном случае
-     */
-    suspend fun unfollow(followerId: UUID, followeeId: UUID): Boolean
+  suspend fun unfollow(followerId: UUID, followeeId: UUID): Boolean =
+      followerAction.unfollow(followerId, followeeId)
 
-    /**
-     * Получает список подписчиков пользователя с пагинацией.
-     * @param userId UUID идентификатор пользователя
-     * @param page Номер страницы (начиная с 0)
-     * @param pageSize Количество элементов на странице
-     * @return Ответ со списком подписчиков [FollowersResponse]
-     */
-    suspend fun listFollowers(userId: UUID, page: Int, pageSize: Int): FollowersResponse
+  suspend fun listFollowers(userId: UUID, page: Int, pageSize: Int): FollowersResponse {
+    val ids = followerAction.listFollowers(userId)
+    val slice = ids.drop((page - 1) * pageSize).take(pageSize)
+    return FollowersResponse(slice.map { it.toString() }, page, pageSize, ids.size)
+  }
 
-    /**
-     * Получает список подписок пользователя с пагинацией.
-     * @param userId UUID идентификатор пользователя
-     * @param page Номер страницы (начиная с 0)
-     * @param pageSize Количество элементов на странице
-     * @return Ответ со списком подписок [FollowingResponse]
-     */
-    suspend fun listFollowing(userId: UUID, page: Int, pageSize: Int): FollowingResponse
+  suspend fun listFollowing(userId: UUID, page: Int, pageSize: Int): FollowingResponse {
+    val ids = followerAction.listFollowing(userId)
+    val slice = ids.drop((page - 1) * pageSize).take(pageSize)
+    return FollowingResponse(slice.map { it.toString() }, page, pageSize, ids.size)
+  }
 }
