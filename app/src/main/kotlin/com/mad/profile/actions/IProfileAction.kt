@@ -2,6 +2,19 @@ package com.mad.profile.actions
 
 import com.mad.profile.model.UserProfile
 
+/**
+ * Интерфейс для работы с профилями пользователей
+ *
+ * Возможные опции:
+ * - Создать профиль
+ * - Получить профиль по ID
+ * - Получить профиль по email
+ * - Получить список профилей
+ * - Обновить профиль
+ * - Удалить профиль
+ * - Получить количество подписчиков
+ * - Получить количество подписок
+ */
 interface IProfileAction {
   suspend fun create(profile: UserProfile): UserProfile
   suspend fun get(id: String): UserProfile?
