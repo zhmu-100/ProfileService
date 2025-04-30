@@ -13,9 +13,7 @@ data class DbProfileRow(
     val city: String? = null,
     val birthdate: String? = null,
     val weight: String? = null,
-    val height: String? = null,
-    val created_at: String,
-    val updated_at: String
+    val height: String? = null
 )
 
 @Serializable

@@ -389,9 +389,7 @@ CREATE TABLE profiles (
     city TEXT,
     birthdate VARCHAR(10) NOT NULL,
     weight NUMERIC(6,2),
-    height NUMERIC(6,2),
-    created_at VARCHAR(255) NOT NULL,
-    updated_at VARCHAR(255) NOT NULL
+    height NUMERIC(6,2)
 );
 
 CREATE INDEX idx_profiles_name ON profiles (name);

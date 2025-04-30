@@ -10,7 +10,6 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.config.*
-import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -25,8 +24,8 @@ class ProfileAction(config: ApplicationConfig) : IProfileAction {
 
   private val http = HttpClient { install(ContentNegotiation) { json() } }
 
-  private fun UserProfile.toDbMap(createdAt: String? = null) =
-      buildMap<String, String> {
+  private fun UserProfile.toDbMap() =
+      buildMap {
         put("id", id)
         put("name", name)
         put("email", email)
@@ -39,9 +38,6 @@ class ProfileAction(config: ApplicationConfig) : IProfileAction {
         put("birthdate", "%04d-%02d-%02d".format(birthdate.year, birthdate.month, birthdate.day))
         weight?.let { put("weight", it.toString()) }
         height?.let { put("height", it.toString()) }
-        val now = Instant.now().toString()
-        put("created_at", createdAt ?: now)
-        put("updated_at", now)
       }
 
   private fun DbProfileRow.toUserProfile(fCnt: Int, gCnt: Int) =
@@ -91,14 +87,10 @@ class ProfileAction(config: ApplicationConfig) : IProfileAction {
 
   override suspend fun update(profile: UserProfile): UserProfile? =
       withContext(Dispatchers.IO) {
-        val oldRow =
-            callRead<DbProfileRow>("profiles", mapOf("id" to profile.id)).firstOrNull()
-                ?: return@withContext null
-        val createdAt = oldRow.created_at
         val req =
             DbUpdateRequest(
                 table = "profiles",
-                data = profile.toDbMap(createdAt),
+                data = profile.toDbMap(),
                 condition = "id = ?",
                 conditionParams = listOf(profile.id))
         val resp: DbResponse =
@@ -124,11 +116,11 @@ class ProfileAction(config: ApplicationConfig) : IProfileAction {
         resp.success == true
       }
 
-  override suspend fun followerCount(id: String): Int =
-      callRead<DbFollowerRow>("followers", mapOf("followee_id" to id)).size
+  override suspend fun followerCount(userId: String): Int =
+      callRead<DbFollowerRow>("followers", mapOf("followee_id" to userId)).size
 
-  override suspend fun followingCount(id: String): Int =
-      callRead<DbFollowerRow>("followers", mapOf("follower_id" to id)).size
+  override suspend fun followingCount(userId: String): Int =
+      callRead<DbFollowerRow>("followers", mapOf("follower_id" to userId)).size
 
   private suspend fun fetchOne(filters: Map<String, String>): UserProfile? {
     val row = callRead<DbProfileRow>("profiles", filters).firstOrNull() ?: return null
