@@ -24,7 +24,7 @@ import org.koin.ktor.ext.inject
 fun Routing.configureProfileRoutes() {
   val profileService: ProfileService by inject()
 
-  route("/api/profiles") {
+  route("/profiles") {
 
     /**
      * Создание нового профиля пользователя.

@@ -26,7 +26,7 @@ import org.koin.ktor.ext.inject
 fun Routing.configureFollowerRoutes() {
   val profileService: ProfileService by inject()
 
-  route("/api/profiles/{id}") {
+  route("/profiles/{id}") {
 
     /**
      * Подписаться на пользователя.
