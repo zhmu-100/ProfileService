@@ -16,12 +16,68 @@ import com.mad.profile.model.UserProfile
  * - Получить количество подписок
  */
 interface IProfileAction {
+  /**
+   * Создать профиль
+   *
+   * @param profile Профиль пользователя
+   * @return Созданный профиль
+   */
   suspend fun create(profile: UserProfile): UserProfile
+
+  /**
+   * Получить профиль по ID
+   *
+   * @param id ID профиля
+   * @return Профиль пользователя или null, если не найден
+   */
   suspend fun get(id: String): UserProfile?
+
+  /**
+   * Получить профиль по email
+   *
+   * @param email Email профиля
+   * @return Профиль пользователя или null, если не найден
+   */
   suspend fun getByEmail(email: String): UserProfile?
+
+  /**
+   * Получить список профилей
+   *
+   * @param page Номер страницы
+   * @param pageSize Размер страницы
+   * @return Список профилей
+   */
   suspend fun list(page: Int, pageSize: Int): List<UserProfile>
+
+  /**
+   * Обновить профиль
+   *
+   * @param profile Профиль пользователя
+   * @return Обновленный профиль или null, если не найден
+   */
   suspend fun update(profile: UserProfile): UserProfile?
+
+  /**
+   * Удалить профиль
+   *
+   * @param id ID профиля
+   * @return true, если удаление успешно, false в противном случае
+   */
   suspend fun delete(id: String): Boolean
+
+  /**
+   * Получить количество подписчиков
+   *
+   * @param userId ID пользователя
+   * @return Количество подписчиков
+   */
   suspend fun followerCount(userId: String): Int
+
+  /**
+   * Получить количество подписок
+   *
+   * @param userId ID пользователя
+   * @return Количество подписок
+   */
   suspend fun followingCount(userId: String): Int
 }

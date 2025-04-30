@@ -2,6 +2,20 @@ package com.mad.profile.dto
 
 import kotlinx.serialization.Serializable
 
+/**
+ * Строка профиля в БД
+ *
+ * @property id ID профиля
+ * @property name Имя пользователя
+ * @property email Email пользователя
+ * @property image_id ID изображения профиля
+ * @property bio Биография пользователя
+ * @property country Страна пользователя
+ * @property city Город пользователя
+ * @property birthdate Дата рождения пользователя
+ * @property weight Вес пользователя
+ * @property height Рост пользователя
+ */
 @Serializable
 data class DbProfileRow(
     val id: String,
@@ -16,5 +30,12 @@ data class DbProfileRow(
     val height: String? = null
 )
 
+/**
+ * Строка подписки в БД
+ *
+ * @property follower_id ID подписчика
+ * @property followee_id ID подписанного пользователя
+ * @property created_at Дата создания подписки
+ */
 @Serializable
 data class DbFollowerRow(val follower_id: String, val followee_id: String, val created_at: String)

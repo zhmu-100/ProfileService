@@ -13,11 +13,11 @@ import org.koin.ktor.ext.inject
  * Конфигурация маршрутов для работы с профилями пользователей.
  *
  * Регистрирует следующие endpoints:
- * - POST /api/profiles - создание профиля
- * - GET /api/profiles/{id} - получение профиля по ID
- * - PUT /api/profiles/{id} - обновление профиля
- * - DELETE /api/profiles/{id} - удаление профиля
- * - GET /api/profiles - список профилей с пагинацией
+ * - POST /profiles - создание профиля
+ * - GET /profiles/{id} - получение профиля по ID
+ * - PUT /profiles/{id} - обновление профиля
+ * - DELETE /profiles/{id} - удаление профиля
+ * - GET /profiles - список профилей с пагинацией
  *
  * Все маршруты обрабатывают валидацию входных данных и возвращают соответствующие HTTP статусы.
  */
@@ -29,14 +29,7 @@ fun Routing.configureProfileRoutes() {
     /**
      * Создание нового профиля пользователя.
      *
-     * Параметры (в теле запроса):
-     * - name: String (обязательное, не пустое)
-     * - email: String (обязательное, валидный формат email)
-     *
-     * Возможные ответы:
-     * - 201 Created: профиль успешно создан
-     * - 400 Bad Request: ошибки валидации
-     * - 500 Internal Server Error: серверная ошибка
+     * В теле запроса - профиль в формате JSON.
      */
     post {
       val profileRequest = call.receive<CreateProfileRequest>()
@@ -58,13 +51,7 @@ fun Routing.configureProfileRoutes() {
     /**
      * Получение профиля по ID.
      *
-     * Параметры:
-     * - id: UUID (в пути запроса)
-     *
-     * Возможные ответы:
-     * - 200 OK: профиль найден
-     * - 400 Bad Request: неверный формат UUID
-     * - 404 Not Found: профиль не найден
+     * В url ид профиля
      */
     get("/{id}") {
       val id =
@@ -85,15 +72,7 @@ fun Routing.configureProfileRoutes() {
     /**
      * Обновление профиля.
      *
-     * Параметры:
-     * - id: UUID (в пути запроса)
-     * - name: String (в теле запроса)
-     * - email: String (в теле запроса)
-     *
-     * Возможные ответы:
-     * - 200 OK: профиль успешно обновлен
-     * - 400 Bad Request: неверный формат UUID
-     * - 404 Not Found: профиль не найден
+     * В теле - JSON с обновленным профилем.
      */
     put("/{id}") {
       val id =
@@ -119,13 +98,7 @@ fun Routing.configureProfileRoutes() {
     /**
      * Удаление профиля.
      *
-     * Параметры:
-     * - id: UUID (в пути запроса)
-     *
-     * Возможные ответы:
-     * - 204 No Content: профиль успешно удален
-     * - 400 Bad Request: неверный формат UUID
-     * - 404 Not Found: профиль не найден
+     * В пути запроса id профиля
      */
     delete("/{id}") {
       val id =

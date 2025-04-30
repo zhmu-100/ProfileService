@@ -16,10 +16,10 @@ import org.koin.ktor.ext.inject
  * Конфигурация маршрутов для работы с подписками пользователей.
  *
  * Регистрирует следующие endpoints:
- * - POST /api/profiles/{id}/follow - подписаться на пользователя
- * - POST /api/profiles/{id}/unfollow - отписаться от пользователя
- * - GET /api/profiles/{id}/followers - получить список подписчиков
- * - GET /api/profiles/{id}/following - получить список подписок
+ * - POST /profiles/{id}/follow - подписаться на пользователя
+ * - POST /profiles/{id}/unfollow - отписаться от пользователя
+ * - GET /profiles/{id}/followers - получить список подписчиков
+ * - GET /profiles/{id}/following - получить список подписок
  *
  * Все маршруты включают валидацию входных данных и обработку ошибок.
  */
@@ -31,13 +31,11 @@ fun Routing.configureFollowerRoutes() {
     /**
      * Подписаться на пользователя.
      *
-     * @param id UUID пользователя, на которого подписываются (в пути)
-     * @param followerId UUID подписчика (в теле запроса)
+     * Тело запроса - JSON с 2 id (follower_id и followee_id). В строке запроса так же указан id
      *
-     * Возможные ответы:
-     * - 204 No Content: подписка успешно оформлена
-     * - 400 Bad Request: неверный формат UUID или ошибка подписки
-     * - 500 Internal Server Error: серверная ошибка
+     * Возможные ответы
+     * - 204 No Content: подписка успешно выполнена
+     * - 400 Bad Request: несоответствие ID
      */
     post("/follow") {
       val id = call.parameters["id"]!!
@@ -55,17 +53,12 @@ fun Routing.configureFollowerRoutes() {
     /**
      * Отписаться от пользователя.
      *
-     * @param id UUID пользователя, от которого отписываются (в пути)
-     * @param followerId UUID отписывающегося (в теле запроса)
-     * @param followeeId UUID пользователя, от которого отписываются (в теле запроса)
+     * Тело запроса - JSON с 2 id (follower_id и followee_id). В строке запроса так же указан id
      *
-     * Особенности:
-     * - Проверяет соответствие followeeId из пути и тела запроса
      *
      * Возможные ответы:
      * - 204 No Content: отписка успешно выполнена
-     * - 400 Bad Request: неверный формат UUID или несоответствие ID
-     * - 500 Internal Server Error: серверная ошибка
+     * - 400 Bad Request: несоответствие ID
      */
     post("/unfollow") {
       val id = call.parameters["id"]!!
@@ -85,14 +78,10 @@ fun Routing.configureFollowerRoutes() {
     /**
      * Получить список подписчиков пользователя.
      *
-     * @param id UUID пользователя
-     * @param page Номер страницы (по умолчанию 1)
-     * @param pageSize Размер страницы (по умолчанию 10, максимум 100)
+     * В строке запроса ID пользователя и параметры пагинации (page и page_size).
      *
      * Возможные ответы:
      * - 200 OK: список подписчиков
-     * - 400 Bad Request: неверный формат UUID или параметров пагинации
-     * - 500 Internal Server Error: серверная ошибка
      */
     get("/followers") {
       val id = call.parameters["id"]!!
@@ -106,14 +95,11 @@ fun Routing.configureFollowerRoutes() {
     /**
      * Получить список подписок пользователя.
      *
-     * @param id UUID пользователя
-     * @param page Номер страницы (по умолчанию 1)
-     * @param pageSize Размер страницы (по умолчанию 10, максимум 100)
+     * В строке запроса ID пользователя и параметры пагинации (page и page_size).
+     *
      *
      * Возможные ответы:
      * - 200 OK: список подписок
-     * - 400 Bad Request: неверный формат UUID или параметров пагинации
-     * - 500 Internal Server Error: серверная ошибка
      */
     get("/following") {
       val id = call.parameters["id"]!!

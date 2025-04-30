@@ -13,6 +13,11 @@ import io.ktor.server.config.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/**
+ * Класс для работы с профилями пользователей
+ *
+ * @see IProfileAction
+ */
 class ProfileAction(config: ApplicationConfig) : IProfileAction {
 
   private val dbMode = config.propertyOrNull("ktor.database.mode")?.getString() ?: "LOCAL"
@@ -24,6 +29,9 @@ class ProfileAction(config: ApplicationConfig) : IProfileAction {
 
   private val http = HttpClient { install(ContentNegotiation) { json() } }
 
+  /**
+   * Преобразует объект [UserProfile] в Map для сохранения в базе данных
+   */
   private fun UserProfile.toDbMap() =
       buildMap {
         put("id", id)
@@ -40,6 +48,9 @@ class ProfileAction(config: ApplicationConfig) : IProfileAction {
         height?.let { put("height", it.toString()) }
       }
 
+  /**
+   * Преобразует объект [DbProfileRow] в объект [UserProfile]
+   */
   private fun DbProfileRow.toUserProfile(fCnt: Int, gCnt: Int) =
       UserProfile(
           id = id,
@@ -59,6 +70,12 @@ class ProfileAction(config: ApplicationConfig) : IProfileAction {
           follower_count = fCnt,
           following_count = gCnt)
 
+  /**
+   * Создает новый профиль пользователя в базе данных
+   *
+   * @param profile объект [UserProfile], который нужно создать
+   * @return созданный объект [UserProfile]
+   */
   override suspend fun create(profile: UserProfile): UserProfile =
       withContext(Dispatchers.IO) {
         val req = DbCreateRequest("profiles", profile.toDbMap())
@@ -73,10 +90,29 @@ class ProfileAction(config: ApplicationConfig) : IProfileAction {
         profile
       }
 
+  /**
+   * Получает профиль пользователя по ID
+   *
+   * @param id ID профиля
+   * @return объект [UserProfile] или null, если профиль не найден
+   */
   override suspend fun get(id: String): UserProfile? = fetchOne(mapOf("id" to id))
 
+  /**
+   * Получает профиль пользователя по email
+   *
+   * @param email email профиля
+   * @return объект [UserProfile] или null, если профиль не найден
+   */
   override suspend fun getByEmail(email: String): UserProfile? = fetchOne(mapOf("email" to email))
 
+  /**
+   * Получает список профилей пользователей
+   *
+   * @param page номер страницы
+   * @param pageSize размер страницы
+   * @return список объектов [UserProfile]
+   */
   override suspend fun list(page: Int, pageSize: Int): List<UserProfile> =
       withContext(Dispatchers.IO) {
         val rows = callRead<DbProfileRow>("profiles", null).sortedBy { it.name }
@@ -85,6 +121,12 @@ class ProfileAction(config: ApplicationConfig) : IProfileAction {
         }
       }
 
+  /**
+   * Обновляет профиль пользователя в базе данных
+   *
+   * @param profile объект [UserProfile], который нужно обновить
+   * @return обновленный объект [UserProfile] или null, если профиль не найден
+   */
   override suspend fun update(profile: UserProfile): UserProfile? =
       withContext(Dispatchers.IO) {
         val req =
@@ -103,6 +145,12 @@ class ProfileAction(config: ApplicationConfig) : IProfileAction {
         if (resp.success != true) null else get(profile.id)
       }
 
+  /**
+   * Удаляет профиль пользователя из базы данных
+   *
+   * @param id ID профиля
+   * @return true, если удаление успешно, false в противном случае
+   */
   override suspend fun delete(id: String): Boolean =
       withContext(Dispatchers.IO) {
         val req = DbDeleteRequest("profiles", "id = ?", listOf(id))
@@ -116,17 +164,38 @@ class ProfileAction(config: ApplicationConfig) : IProfileAction {
         resp.success == true
       }
 
+  /**
+   * Получает количество подписчиков пользователя
+   *
+   * @param userId ID пользователя
+   * @return количество подписчиков
+   */
   override suspend fun followerCount(userId: String): Int =
       callRead<DbFollowerRow>("followers", mapOf("followee_id" to userId)).size
 
+  /**
+   * Получает количество подписок пользователя
+   *
+   * @param userId ID пользователя
+   * @return количество подписок
+   */
   override suspend fun followingCount(userId: String): Int =
       callRead<DbFollowerRow>("followers", mapOf("follower_id" to userId)).size
 
+  /**
+   * Получает профиль пользователя по фильтрам
+   *
+   * @param filters карта фильтров для поиска профиля
+   * @return объект [UserProfile] или null, если профиль не найден
+   */
   private suspend fun fetchOne(filters: Map<String, String>): UserProfile? {
     val row = callRead<DbProfileRow>("profiles", filters).firstOrNull() ?: return null
     return row.toUserProfile(followerCount(row.id), followingCount(row.id))
   }
 
+  /**
+   * Выполняет запрос к базе данных для получения списка записей
+   */
   private suspend inline fun <reified R> callRead(
       table: String,
       filters: Map<String, String>? = null

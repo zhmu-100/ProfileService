@@ -12,10 +12,7 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 
 /**
- * Точка входа в приложение Profile Service. Запускает встроенный Netty сервер с конфигурацией из
- * [AppConfig].
- *
- * @see AppConfig конфигурация хоста и порта сервера
+ * Точка входа в приложение Profile Service. Запускает встроенный Netty сервер
  */
 fun main() {
   embeddedServer(
