@@ -25,7 +25,7 @@ class ProfileAction(config: ApplicationConfig) : IProfileAction {
 
   private val http = HttpClient { install(ContentNegotiation) { json() } }
 
-  private fun UserProfile.toDbMap() =
+  private fun UserProfile.toDbMap(createdAt: String? = null) =
       buildMap<String, String> {
         put("id", id)
         put("name", name)
@@ -40,7 +40,7 @@ class ProfileAction(config: ApplicationConfig) : IProfileAction {
         weight?.let { put("weight", it.toString()) }
         height?.let { put("height", it.toString()) }
         val now = Instant.now().toString()
-        put("created_at", now)
+        put("created_at", createdAt ?: now)
         put("updated_at", now)
       }
 
@@ -91,10 +91,14 @@ class ProfileAction(config: ApplicationConfig) : IProfileAction {
 
   override suspend fun update(profile: UserProfile): UserProfile? =
       withContext(Dispatchers.IO) {
+        val oldRow =
+            callRead<DbProfileRow>("profiles", mapOf("id" to profile.id)).firstOrNull()
+                ?: return@withContext null
+        val createdAt = oldRow.created_at
         val req =
             DbUpdateRequest(
                 table = "profiles",
-                data = profile.toDbMap(),
+                data = profile.toDbMap(createdAt),
                 condition = "id = ?",
                 conditionParams = listOf(profile.id))
         val resp: DbResponse =

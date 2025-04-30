@@ -128,11 +128,16 @@ fun Routing.configureProfileRoutes() {
      * - 404 Not Found: профиль не найден
      */
     delete("/{id}") {
-      val id = call.parameters["id"] ?: return@delete
-      call.respond(HttpStatusCode.BadRequest, ErrorResponse("invalid_id", "Missing profile id"))
+      val id =
+          call.parameters["id"]
+              ?: return@delete call.respond(
+                  HttpStatusCode.BadRequest, ErrorResponse("invalid_id", "Missing profile id"))
 
-      if (profileService.deleteProfile(id)) call.respond(HttpStatusCode.NoContent)
-      else call.respond(HttpStatusCode.NotFound, ErrorResponse("not_found", "Profile not found"))
+      if (profileService.deleteProfile(id)) {
+        call.respond(HttpStatusCode.NoContent)
+      } else {
+        call.respond(HttpStatusCode.NotFound, ErrorResponse("not_found", "Profile not found"))
+      }
     }
 
     /**
