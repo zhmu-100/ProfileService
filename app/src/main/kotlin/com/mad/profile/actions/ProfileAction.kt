@@ -10,7 +10,7 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.config.*
-import java.util.*
+import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -25,118 +25,111 @@ class ProfileAction(config: ApplicationConfig) : IProfileAction {
 
   private val http = HttpClient { install(ContentNegotiation) { json() } }
 
-  private fun DbProfileRow.toResponse(followers: Int, following: Int) =
-      ProfileResponse(
+  private fun UserProfile.toDbMap() =
+      buildMap<String, String> {
+        put("id", id)
+        put("name", name)
+        put("email", email)
+        put("image_id", image_id ?: "")
+        put("bio", bio ?: "")
+        location?.let {
+          put("country", it.country)
+          put("city", it.city)
+        }
+        put("birthdate", "%04d-%02d-%02d".format(birthdate.year, birthdate.month, birthdate.day))
+        weight?.let { put("weight", it.toString()) }
+        height?.let { put("height", it.toString()) }
+        val now = Instant.now().toString()
+        put("created_at", now)
+        put("updated_at", now)
+      }
+
+  private fun DbProfileRow.toUserProfile(fCnt: Int, gCnt: Int) =
+      UserProfile(
           id = id,
           name = name,
           email = email,
-          imageId = image_id.takeIf { !it.isNullOrBlank() },
+          image_id = image_id.takeIf { !it.isNullOrBlank() },
           bio = bio,
-          location = if (country != null && city != null) LocationResponse(country, city) else null,
+          location = if (country != null && city != null) Location(country, city) else null,
           birthdate =
               birthdate?.let {
-                val parts = it.split('-')
-                BirthdateResponse(parts[0].toInt(), parts[1].toInt(), parts[2].toInt())
-              },
+                val p = it.split('-')
+                Birthdate(p[0].toInt(), p[1].toInt(), p[2].toInt())
+              }
+                  ?: Birthdate(0, 0, 0),
           weight = weight?.toDoubleOrNull(),
           height = height?.toDoubleOrNull(),
-          followerCount = followers,
-          followingCount = following)
+          follower_count = fCnt,
+          following_count = gCnt)
 
-  override suspend fun createProfile(req: ProfileRequest): ProfileResponse =
+  override suspend fun create(profile: UserProfile): UserProfile =
       withContext(Dispatchers.IO) {
-        val id = UUID.randomUUID().toString()
-        val create = DbCreateRequest("profiles", req.toDbMap(id))
-
+        val req = DbCreateRequest("profiles", profile.toDbMap())
         val resp: DbResponse =
             http
                 .post("$baseUrl/create") {
                   contentType(ContentType.Application.Json)
-                  setBody(create)
+                  setBody(req)
                 }
                 .body()
-
         require(resp.success == true) { "DB create failed: ${resp.error}" }
-        req.toResponseSkeleton(id)
+        profile
       }
 
-  private fun ProfileRequest.toResponseSkeleton(id: String) =
-      ProfileResponse(
-          id = id,
-          name = name,
-          email = email,
-          imageId = imageId,
-          bio = bio,
-          location = location,
-          birthdate = birthdate,
-          weight = weight,
-          height = height,
-          followerCount = 0,
-          followingCount = 0)
+  override suspend fun get(id: String): UserProfile? = fetchOne(mapOf("id" to id))
 
-  override suspend fun getById(id: UUID): ProfileResponse? = fetchOne(mapOf("id" to id.toString()))
-  override suspend fun getByEmail(email: String): ProfileResponse? =
-      fetchOne(mapOf("email" to email))
+  override suspend fun getByEmail(email: String): UserProfile? = fetchOne(mapOf("email" to email))
 
-  private suspend fun fetchOne(filters: Map<String, String>): ProfileResponse? {
-    val row = callRead<DbProfileRow>("profiles", filters).firstOrNull() ?: return null
-    val uuid = UUID.fromString(row.id)
-    return row.toResponse(followerCount(uuid), followingCount(uuid))
-  }
-
-  override suspend fun list(page: Int, pageSize: Int): Pair<List<ProfileResponse>, Int> =
+  override suspend fun list(page: Int, pageSize: Int): List<UserProfile> =
       withContext(Dispatchers.IO) {
         val rows = callRead<DbProfileRow>("profiles", null).sortedBy { it.name }
-
-        val total = rows.size
-        val slice = rows.drop((page - 1) * pageSize).take(pageSize)
-        val profiles =
-            slice.map {
-              val uuid = UUID.fromString(it.id)
-              it.toResponse(followerCount(uuid), followingCount(uuid))
-            }
-        Pair(profiles, total)
+        rows.drop((page - 1) * pageSize).take(pageSize).map {
+          it.toUserProfile(followerCount(it.id), followingCount(it.id))
+        }
       }
 
-  override suspend fun update(id: UUID, req: ProfileRequest): ProfileResponse? =
+  override suspend fun update(profile: UserProfile): UserProfile? =
       withContext(Dispatchers.IO) {
-        val update =
+        val req =
             DbUpdateRequest(
                 table = "profiles",
-                data = req.toDbMap(id.toString()),
+                data = profile.toDbMap(),
                 condition = "id = ?",
-                conditionParams = listOf(id.toString()))
-
+                conditionParams = listOf(profile.id))
         val resp: DbResponse =
             http
                 .put("$baseUrl/update") {
                   contentType(ContentType.Application.Json)
-                  setBody(update)
+                  setBody(req)
                 }
                 .body()
-
-        if (resp.success != true) return@withContext null
-        fetchOne(mapOf("id" to id.toString()))
+        if (resp.success != true) null else get(profile.id)
       }
 
-  override suspend fun delete(id: UUID): Boolean =
+  override suspend fun delete(id: String): Boolean =
       withContext(Dispatchers.IO) {
-        val del = DbDeleteRequest("profiles", "id = ?", listOf(id.toString()))
+        val req = DbDeleteRequest("profiles", "id = ?", listOf(id))
         val resp: DbResponse =
             http
                 .delete("$baseUrl/delete") {
                   contentType(ContentType.Application.Json)
-                  setBody(del)
+                  setBody(req)
                 }
                 .body()
         resp.success == true
       }
 
-  override suspend fun followerCount(id: UUID): Int =
-      callRead<DbFollowerRow>("followers", mapOf("followee_id" to id.toString())).size
+  override suspend fun followerCount(id: String): Int =
+      callRead<DbFollowerRow>("followers", mapOf("followee_id" to id)).size
 
-  override suspend fun followingCount(id: UUID): Int =
-      callRead<DbFollowerRow>("followers", mapOf("follower_id" to id.toString())).size
+  override suspend fun followingCount(id: String): Int =
+      callRead<DbFollowerRow>("followers", mapOf("follower_id" to id)).size
+
+  private suspend fun fetchOne(filters: Map<String, String>): UserProfile? {
+    val row = callRead<DbProfileRow>("profiles", filters).firstOrNull() ?: return null
+    return row.toUserProfile(followerCount(row.id), followingCount(row.id))
+  }
 
   private suspend inline fun <reified R> callRead(
       table: String,

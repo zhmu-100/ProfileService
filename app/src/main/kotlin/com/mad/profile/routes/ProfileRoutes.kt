@@ -1,17 +1,13 @@
 package com.mad.profile.routes
 
-import com.mad.profile.model.ErrorResponse
-import com.mad.profile.model.ProfileRequest
+import com.mad.profile.model.*
+import com.mad.profile.service.ProfileService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import java.util.*
-import mu.KotlinLogging
 import org.koin.ktor.ext.inject
-
-private val logger = KotlinLogging.logger {}
 
 /**
  * Конфигурация маршрутов для работы с профилями пользователей.
@@ -26,7 +22,7 @@ private val logger = KotlinLogging.logger {}
  * Все маршруты обрабатывают валидацию входных данных и возвращают соответствующие HTTP статусы.
  */
 fun Routing.configureProfileRoutes() {
-  val profileService by inject<ProfileService>()
+  val profileService: ProfileService by inject()
 
   route("/api/profiles") {
 
@@ -43,30 +39,20 @@ fun Routing.configureProfileRoutes() {
      * - 500 Internal Server Error: серверная ошибка
      */
     post {
-      println("✅ POST /api/profiles called")
-      try {
-        val profileRequest = call.receive<ProfileRequest>()
+      val profileRequest = call.receive<CreateProfileRequest>()
 
-        if (profileRequest.name.isBlank()) {
-          call.respond(
-              HttpStatusCode.BadRequest, ErrorResponse("validation_error", "Name cannot be empty"))
-          return@post
-        }
-
-        if (profileRequest.email.isBlank() || !isValidEmail(profileRequest.email)) {
-          call.respond(
-              HttpStatusCode.BadRequest, ErrorResponse("validation_error", "Invalid email format"))
-          return@post
-        }
-
-        val profile = profileService.createProfile(profileRequest)
-        call.respond(HttpStatusCode.Created, profile)
-      } catch (e: Exception) {
-        logger.error(e) { "Error creating profile" }
-        call.respond(
-            HttpStatusCode.InternalServerError,
-            ErrorResponse("server_error", "Failed to create profile"))
+      if (profileRequest.profile.name.isBlank()) {
+        return@post call.respond(
+            HttpStatusCode.BadRequest, ErrorResponse("validation_error", "Name cannot be empty"))
       }
+
+      if (!isValidEmail(profileRequest.profile.email)) {
+        return@post call.respond(
+            HttpStatusCode.BadRequest, ErrorResponse("validation_error", "Invalid email format"))
+      }
+
+      val created = profileService.createProfile(profileRequest)
+      call.respond(HttpStatusCode.Created, created)
     }
 
     /**
@@ -81,24 +67,18 @@ fun Routing.configureProfileRoutes() {
      * - 404 Not Found: профиль не найден
      */
     get("/{id}") {
-      val idParam = call.parameters["id"]
       val id =
-          try {
-            UUID.fromString(idParam)
-          } catch (e: Exception) {
-            null
-          }
-
-      if (id == null) {
-        call.respond(HttpStatusCode.BadRequest, ErrorResponse("invalid_id", "Invalid UUID format"))
-        return@get
-      }
+          call.parameters["id"]
+              ?: return@get call.respond(
+                  HttpStatusCode.BadRequest,
+                  ErrorResponse("invalid_id", "Missing id"),
+              )
 
       val profile = profileService.getProfile(id)
       if (profile == null) {
         call.respond(HttpStatusCode.NotFound, ErrorResponse("not_found", "Profile not found"))
       } else {
-        call.respond(HttpStatusCode.OK, profile)
+        call.respond(profile)
       }
     }
 
@@ -116,26 +96,23 @@ fun Routing.configureProfileRoutes() {
      * - 404 Not Found: профиль не найден
      */
     put("/{id}") {
-      val idParam = call.parameters["id"]
       val id =
-          try {
-            UUID.fromString(idParam)
-          } catch (e: Exception) {
-            null
-          }
+          call.parameters["id"]
+              ?: return@put call.respond(
+                  HttpStatusCode.BadRequest, ErrorResponse("invalid_id", "Missing profile id"))
 
-      if (id == null) {
-        call.respond(HttpStatusCode.BadRequest, ErrorResponse("invalid_id", "Invalid UUID format"))
-        return@put
+      val req = call.receive<UpdateProfileRequest>()
+
+      if (req.profile.id != id) {
+        return@put call.respond(
+            HttpStatusCode.BadRequest, ErrorResponse("mismatch_id", "ID in path and body differ"))
       }
 
-      val profileRequest = call.receive<ProfileRequest>()
-
-      val updated = profileService.updateProfile(id, profileRequest)
+      val updated = profileService.updateProfile(req)
       if (updated == null) {
         call.respond(HttpStatusCode.NotFound, ErrorResponse("not_found", "Profile not found"))
       } else {
-        call.respond(HttpStatusCode.OK, updated)
+        call.respond(updated)
       }
     }
 
@@ -151,25 +128,11 @@ fun Routing.configureProfileRoutes() {
      * - 404 Not Found: профиль не найден
      */
     delete("/{id}") {
-      val idParam = call.parameters["id"]
-      val id =
-          try {
-            UUID.fromString(idParam)
-          } catch (e: Exception) {
-            null
-          }
+      val id = call.parameters["id"] ?: return@delete
+      call.respond(HttpStatusCode.BadRequest, ErrorResponse("invalid_id", "Missing profile id"))
 
-      if (id == null) {
-        call.respond(HttpStatusCode.BadRequest, ErrorResponse("invalid_id", "Invalid UUID format"))
-        return@delete
-      }
-
-      val success = profileService.deleteProfile(id)
-      if (success) {
-        call.respond(HttpStatusCode.NoContent)
-      } else {
-        call.respond(HttpStatusCode.NotFound, ErrorResponse("not_found", "Profile not found"))
-      }
+      if (profileService.deleteProfile(id)) call.respond(HttpStatusCode.NoContent)
+      else call.respond(HttpStatusCode.NotFound, ErrorResponse("not_found", "Profile not found"))
     }
 
     /**
@@ -188,14 +151,13 @@ fun Routing.configureProfileRoutes() {
       val pageSize = call.request.queryParameters["pageSize"]?.toIntOrNull() ?: 10
 
       if (page < 1 || pageSize < 1 || pageSize > 100) {
-        call.respond(
+        return@get call.respond(
             HttpStatusCode.BadRequest,
             ErrorResponse("invalid_pagination", "Invalid pagination parameters"))
-        return@get
       }
 
       val result = profileService.listProfiles(page, pageSize)
-      call.respond(HttpStatusCode.OK, result)
+      call.respond(result)
     }
   }
 }

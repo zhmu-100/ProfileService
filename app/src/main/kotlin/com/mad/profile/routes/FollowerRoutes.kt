@@ -2,6 +2,7 @@ package com.mad.profile.routes
 
 import com.mad.profile.model.ErrorResponse
 import com.mad.profile.model.FollowRequest
+import com.mad.profile.model.UnfollowRequest
 import com.mad.profile.service.ProfileService
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -25,7 +26,7 @@ import org.koin.ktor.ext.inject
 fun Routing.configureFollowerRoutes() {
   val profileService: ProfileService by inject()
 
-  route("/api/profiles") {
+  route("/api/profiles/{id}") {
 
     /**
      * Подписаться на пользователя.
@@ -38,38 +39,17 @@ fun Routing.configureFollowerRoutes() {
      * - 400 Bad Request: неверный формат UUID или ошибка подписки
      * - 500 Internal Server Error: серверная ошибка
      */
-    post("/{id}/follow") {
-      try {
-        val followeeId =
-            call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+    post("/follow") {
+      val id = call.parameters["id"]!!
+      val body = call.receive<FollowRequest>()
 
-        if (followeeId == null) {
-          call.respond(
-              HttpStatusCode.BadRequest, ErrorResponse("invalid_id", "Invalid profile ID format"))
-          return@post
-        }
+      if (body.followee_id != id)
+          return@post call.respond(
+              HttpStatusCode.BadRequest,
+              ErrorResponse("mismatch_id", "followee_id differs from path"))
 
-        val followRequest = call.receive<FollowRequest>()
-        val followerId = runCatching { UUID.fromString(followRequest.followerId) }.getOrNull()
-
-        if (followerId == null) {
-          call.respond(
-              HttpStatusCode.BadRequest, ErrorResponse("invalid_id", "Invalid follower ID format"))
-          return@post
-        }
-
-        val success = profileService.follow(followerId, followeeId)
-        if (success) {
-          call.respond(HttpStatusCode.NoContent)
-        } else {
-          call.respond(
-              HttpStatusCode.BadRequest, ErrorResponse("follow_error", "Failed to follow user"))
-        }
-      } catch (e: Exception) {
-        call.respond(
-            HttpStatusCode.InternalServerError,
-            ErrorResponse("server_error", "Failed to follow user"))
-      }
+      if (profileService.follow(body.follower_id, id)) call.respond(HttpStatusCode.NoContent)
+      else call.respond(HttpStatusCode.BadRequest, ErrorResponse("follow_error", "Follow failed"))
     }
 
     /**
@@ -87,49 +67,19 @@ fun Routing.configureFollowerRoutes() {
      * - 400 Bad Request: неверный формат UUID или несоответствие ID
      * - 500 Internal Server Error: серверная ошибка
      */
-    post("/{id}/unfollow") {
-      try {
-        val followeeIdFromUrl =
-            call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+    post("/unfollow") {
+      val id = call.parameters["id"]!!
+      val body = call.receive<UnfollowRequest>()
 
-        if (followeeIdFromUrl == null) {
-          call.respond(
-              HttpStatusCode.BadRequest, ErrorResponse("invalid_id", "Invalid profile ID format"))
-          return@post
-        }
-
-        val unfollowRequest = call.receive<FollowRequest>()
-        val followerId = runCatching { UUID.fromString(unfollowRequest.followerId) }.getOrNull()
-        val followeeIdFromBody =
-            runCatching { UUID.fromString(unfollowRequest.followeeId) }.getOrNull()
-
-        if (followerId == null || followeeIdFromBody == null) {
-          call.respond(
-              HttpStatusCode.BadRequest, ErrorResponse("invalid_id", "Invalid UUID format in body"))
-          return@post
-        }
-
-        // Вот эта проверка ключевая
-        if (followeeIdFromUrl != followeeIdFromBody) {
-          call.respond(
+      if (body.followee_id != id)
+          return@post call.respond(
               HttpStatusCode.BadRequest,
-              ErrorResponse("mismatch_id", "Followee ID in path and body do not match"))
-          return@post
-        }
+              ErrorResponse("mismatch_id", "followee_id differs from path"))
 
-        val success = profileService.unfollow(followerId, followeeIdFromUrl)
-
-        if (success) {
-          call.respond(HttpStatusCode.NoContent)
-        } else {
+      if (profileService.unfollow(body.follower_id, id)) call.respond(HttpStatusCode.NoContent)
+      else
           call.respond(
-              HttpStatusCode.BadRequest, ErrorResponse("unfollow_error", "Failed to unfollow user"))
-        }
-      } catch (e: Exception) {
-        call.respond(
-            HttpStatusCode.InternalServerError,
-            ErrorResponse("server_error", "Failed to unfollow user"))
-      }
+              HttpStatusCode.BadRequest, ErrorResponse("unfollow_error", "Unfollow failed"))
     }
 
     /**
@@ -144,33 +94,13 @@ fun Routing.configureFollowerRoutes() {
      * - 400 Bad Request: неверный формат UUID или параметров пагинации
      * - 500 Internal Server Error: серверная ошибка
      */
-    get("/{id}/followers") {
-      try {
-        val userId = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+    get("/followers") {
+      val id = call.parameters["id"]!!
+      val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
+      val pageSize = call.request.queryParameters["page_size"]?.toIntOrNull() ?: 10
 
-        if (userId == null) {
-          call.respond(
-              HttpStatusCode.BadRequest, ErrorResponse("invalid_id", "Invalid profile ID format"))
-          return@get
-        }
-
-        val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
-        val pageSize = call.request.queryParameters["pageSize"]?.toIntOrNull() ?: 10
-
-        if (page < 1 || pageSize < 1 || pageSize > 100) {
-          call.respond(
-              HttpStatusCode.BadRequest,
-              ErrorResponse("invalid_pagination", "Invalid pagination parameters"))
-          return@get
-        }
-
-        val followers = profileService.listFollowers(userId, page, pageSize)
-        call.respond(HttpStatusCode.OK, followers)
-      } catch (e: Exception) {
-        call.respond(
-            HttpStatusCode.InternalServerError,
-            ErrorResponse("server_error", "Failed to list followers"))
-      }
+      val resp = profileService.listFollowers(id, page, pageSize)
+      call.respond(resp)
     }
 
     /**
@@ -185,33 +115,13 @@ fun Routing.configureFollowerRoutes() {
      * - 400 Bad Request: неверный формат UUID или параметров пагинации
      * - 500 Internal Server Error: серверная ошибка
      */
-    get("/{id}/following") {
-      try {
-        val userId = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+    get("/following") {
+      val id = call.parameters["id"]!!
+      val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
+      val pageSize = call.request.queryParameters["page_size"]?.toIntOrNull() ?: 10
 
-        if (userId == null) {
-          call.respond(
-              HttpStatusCode.BadRequest, ErrorResponse("invalid_id", "Invalid profile ID format"))
-          return@get
-        }
-
-        val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
-        val pageSize = call.request.queryParameters["pageSize"]?.toIntOrNull() ?: 10
-
-        if (page < 1 || pageSize < 1 || pageSize > 100) {
-          call.respond(
-              HttpStatusCode.BadRequest,
-              ErrorResponse("invalid_pagination", "Invalid pagination parameters"))
-          return@get
-        }
-
-        val following = profileService.listFollowing(userId, page, pageSize)
-        call.respond(HttpStatusCode.OK, following)
-      } catch (e: Exception) {
-        call.respond(
-            HttpStatusCode.InternalServerError,
-            ErrorResponse("server_error", "Failed to list following"))
-      }
+      val resp = profileService.listFollowing(id, page, pageSize)
+      call.respond(resp)
     }
   }
 }

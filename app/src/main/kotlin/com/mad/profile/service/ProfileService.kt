@@ -3,50 +3,48 @@ package com.mad.profile.service
 import com.mad.profile.actions.IFollowerAction
 import com.mad.profile.actions.IProfileAction
 import com.mad.profile.model.*
-import java.util.UUID
 
-/**
- * Реализация сервиса для работы с профилями пользователей и подписками.
- *
- * @property profileRepository репозиторий для работы с профилями пользователей
- * @property followerRepository репозиторий для работы с подписками пользователей
- */
 class ProfileService(
     private val profileAction: IProfileAction,
     private val followerAction: IFollowerAction
 ) {
-  suspend fun createProfile(req: ProfileRequest): ProfileResponse {
-    val existing = profileAction.getByEmail(req.email)
-    return existing ?: profileAction.createProfile(req)
+  suspend fun createProfile(request: CreateProfileRequest): UserProfile {
+    val candidate = request.profile
+
+    profileAction.getByEmail(candidate.email)?.let {
+      return it
+    }
+
+    val withId =
+        if (candidate.id.isBlank()) candidate.copy(id = java.util.UUID.randomUUID().toString())
+        else candidate
+
+    return profileAction.create(withId)
   }
 
-  suspend fun getProfile(id: UUID): ProfileResponse? = profileAction.getById(id)
+  suspend fun getProfile(id: String): UserProfile? = profileAction.get(id)
 
-  suspend fun listProfiles(page: Int, pageSize: Int): ProfilesResponse {
-    val (list, total) = profileAction.list(page, pageSize)
-    return ProfilesResponse(list, page, pageSize, total)
-  }
+  suspend fun listProfiles(page: Int, pageSize: Int): List<UserProfile> =
+      profileAction.list(page, pageSize)
 
-  suspend fun updateProfile(id: UUID, req: ProfileRequest): ProfileResponse? =
-      profileAction.update(id, req)
+  suspend fun updateProfile(request: UpdateProfileRequest): UserProfile? =
+      profileAction.update(request.profile)
 
-  suspend fun deleteProfile(id: UUID): Boolean = profileAction.delete(id)
+  suspend fun deleteProfile(id: String): Boolean = profileAction.delete(id)
 
-  suspend fun follow(followerId: UUID, followeeId: UUID): Boolean =
+  suspend fun follow(followerId: String, followeeId: String): Boolean =
       followerAction.follow(followerId, followeeId)
 
-  suspend fun unfollow(followerId: UUID, followeeId: UUID): Boolean =
+  suspend fun unfollow(followerId: String, followeeId: String): Boolean =
       followerAction.unfollow(followerId, followeeId)
 
-  suspend fun listFollowers(userId: UUID, page: Int, pageSize: Int): FollowersResponse {
-    val ids = followerAction.listFollowers(userId)
-    val slice = ids.drop((page - 1) * pageSize).take(pageSize)
-    return FollowersResponse(slice.map { it.toString() }, page, pageSize, ids.size)
+  suspend fun listFollowers(userId: String, page: Int, pageSize: Int): ListFollowersResponse {
+    val ids = followerAction.listFollowers(userId).drop((page - 1) * pageSize).take(pageSize)
+    return ListFollowersResponse(ids)
   }
 
-  suspend fun listFollowing(userId: UUID, page: Int, pageSize: Int): FollowingResponse {
-    val ids = followerAction.listFollowing(userId)
-    val slice = ids.drop((page - 1) * pageSize).take(pageSize)
-    return FollowingResponse(slice.map { it.toString() }, page, pageSize, ids.size)
+  suspend fun listFollowing(userId: String, page: Int, pageSize: Int): ListFollowingResponse {
+    val ids = followerAction.listFollowing(userId).drop((page - 1) * pageSize).take(pageSize)
+    return ListFollowingResponse(ids)
   }
 }

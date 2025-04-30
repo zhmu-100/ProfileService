@@ -27,68 +27,65 @@ class FollowerAction(config: ApplicationConfig) : IFollowerAction {
       else "http://$dbHost:$dbPort"
   private val http = HttpClient { install(ContentNegotiation) { json() } }
 
-  override suspend fun follow(follower: UUID, followee: UUID): Boolean =
+  override suspend fun follow(followerId: String, followeeId: String): Boolean =
       withContext(Dispatchers.IO) {
-        if (follower == followee) return@withContext false
-        if (isFollowing(follower, followee)) return@withContext false
+        if (followerId == followeeId) return@withContext false
+        if (isFollowing(followerId, followeeId)) return@withContext false
 
-        val body =
+        val req =
             DbCreateRequest(
                 table = "followers",
                 data =
                     mapOf(
-                        "follower_id" to follower.toString(),
-                        "followee_id" to followee.toString(),
+                        "follower_id" to followerId,
+                        "followee_id" to followeeId,
                         "created_at" to Instant.now().toString()))
         val resp: DbResponse =
             http
                 .post("$baseUrl/create") {
                   contentType(ContentType.Application.Json)
-                  setBody(body)
+                  setBody(req)
                 }
                 .body()
-
         resp.success == true
       }
 
-  override suspend fun unfollow(follower: UUID, followee: UUID): Boolean =
+  override suspend fun unfollow(followerId: String, followeeId: String): Boolean =
       withContext(Dispatchers.IO) {
-        val del =
+        val req =
             DbDeleteRequest(
                 table = "followers",
                 condition = "follower_id = ? AND followee_id = ?",
-                conditionParams = listOf(follower.toString(), followee.toString()))
+                conditionParams = listOf(followerId, followeeId))
         val resp: DbResponse =
             http
                 .delete("$baseUrl/delete") {
                   contentType(ContentType.Application.Json)
-                  setBody(del)
+                  setBody(req)
                 }
                 .body()
         resp.success == true
       }
 
-  override suspend fun listFollowers(user: UUID): List<UUID> =
-      readIds(mapOf("followee_id" to user.toString())) { it.follower_id }
+  override suspend fun listFollowers(userId: String): List<String> =
+      readIds(mapOf("followee_id" to userId)) { it.follower_id }
 
-  override suspend fun listFollowing(user: UUID): List<UUID> =
-      readIds(mapOf("follower_id" to user.toString())) { it.followee_id }
+  override suspend fun listFollowing(userId: String): List<String> =
+      readIds(mapOf("follower_id" to userId)) { it.followee_id }
 
-  override suspend fun isFollowing(follower: UUID, followee: UUID): Boolean =
-      readIds(mapOf("follower_id" to follower.toString(), "followee_id" to followee.toString())) {
-            it.follower_id
-          }
+  override suspend fun isFollowing(followerId: String, followeeId: String): Boolean =
+      readIds(mapOf("follower_id" to followerId, "followee_id" to followeeId)) { it.follower_id }
           .isNotEmpty()
 
   private suspend fun readIds(
       filters: Map<String, String>,
-      extractor: (DbFollowerRow) -> String
-  ): List<UUID> =
+      selector: (DbFollowerRow) -> String
+  ): List<String> =
       http
           .post("$baseUrl/read") {
             contentType(ContentType.Application.Json)
             setBody(DbReadRequest(table = "followers", filters = filters))
           }
           .body<List<DbFollowerRow>>()
-          .map { UUID.fromString(extractor(it)) }
+          .map(selector)
 }

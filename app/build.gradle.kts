@@ -63,5 +63,5 @@ java {
 
 application {
     // Define the main class for the application.
-    mainClass = "com.mad.feed.ApplicationKt"
+    mainClass = "com.mad.profile.ApplicationKt"
 }

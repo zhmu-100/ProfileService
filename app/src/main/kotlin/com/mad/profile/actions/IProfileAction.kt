@@ -1,16 +1,14 @@
 package com.mad.profile.actions
 
-import com.mad.profile.model.ProfileRequest
-import com.mad.profile.model.ProfileResponse
-import java.util.*
+import com.mad.profile.model.UserProfile
 
 interface IProfileAction {
-  suspend fun createProfile(req: ProfileRequest): ProfileResponse
-  suspend fun getById(id: UUID): ProfileResponse?
-  suspend fun getByEmail(email: String): ProfileResponse?
-  suspend fun list(page: Int, pageSize: Int): Pair<List<ProfileResponse>, Int>
-  suspend fun update(id: UUID, req: ProfileRequest): ProfileResponse?
-  suspend fun delete(id: UUID): Boolean
-  suspend fun followerCount(id: UUID): Int
-  suspend fun followingCount(id: UUID): Int
+  suspend fun create(profile: UserProfile): UserProfile
+  suspend fun get(id: String): UserProfile?
+  suspend fun getByEmail(email: String): UserProfile?
+  suspend fun list(page: Int, pageSize: Int): List<UserProfile>
+  suspend fun update(profile: UserProfile): UserProfile?
+  suspend fun delete(id: String): Boolean
+  suspend fun followerCount(userId: String): Int
+  suspend fun followingCount(userId: String): Int
 }

@@ -1,11 +1,9 @@
 package com.mad.profile.actions
 
-import java.util.*
-
 interface IFollowerAction {
-  suspend fun follow(follower: UUID, followee: UUID): Boolean
-  suspend fun unfollow(follower: UUID, followee: UUID): Boolean
-  suspend fun listFollowers(user: UUID): List<UUID>
-  suspend fun listFollowing(user: UUID): List<UUID>
-  suspend fun isFollowing(follower: UUID, followee: UUID): Boolean
+  suspend fun follow(followerId: String, followeeId: String): Boolean
+  suspend fun unfollow(followerId: String, followeeId: String): Boolean
+  suspend fun listFollowers(userId: String): List<String>
+  suspend fun listFollowing(userId: String): List<String>
+  suspend fun isFollowing(followerId: String, followeeId: String): Boolean
 }
