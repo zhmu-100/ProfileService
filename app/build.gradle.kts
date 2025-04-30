@@ -3,15 +3,17 @@
  *
  * This generated file contains a sample Kotlin application project to get you started.
  * For more details on building Java & JVM projects, please refer to https://docs.gradle.org/8.13/userguide/building_java_projects.html in the Gradle documentation.
+ * This project uses @Incubating APIs which are subject to change.
  */
 
 plugins {
-    // Apply the org.jetbrains.kotlin.jvm Plugin to add support for Kotlin.
-    alias(libs.plugins.kotlin.jvm)
-
-    // Apply the application plugin to add support for building a CLI application in Java.
+    kotlin("jvm") version "1.8.10"
+    kotlin("plugin.serialization") version "1.8.10"
+    id("org.jetbrains.dokka") version "1.9.20"
+    id("com.ncorti.ktfmt.gradle") version "0.11.0"
     application
 }
+
 
 repositories {
     // Use Maven Central for resolving dependencies.
@@ -19,28 +21,48 @@ repositories {
 }
 
 dependencies {
-    // Use JUnit Jupiter for testing.
-    testImplementation(libs.junit.jupiter)
-
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-
-    // This dependency is used by the application.
     implementation(libs.guava)
+    implementation("io.ktor:ktor-server-core-jvm:2.2.4")
+    implementation("io.ktor:ktor-server-netty-jvm:2.2.4")
+    implementation("ch.qos.logback:logback-classic:1.2.11")
+    implementation("io.github.cdimascio:dotenv-kotlin:6.4.1")
+
+    implementation("io.ktor:ktor-server-content-negotiation-jvm:2.2.4")
+    implementation("io.ktor:ktor-serialization-kotlinx-json-jvm:2.2.4")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.3.2")
+
+    implementation("io.ktor:ktor-client-core-jvm:2.2.4")
+    implementation("io.ktor:ktor-client-cio-jvm:2.2.4")
+    implementation("io.ktor:ktor-client-content-negotiation-jvm:2.2.4")
+    implementation("io.ktor:ktor-serialization-kotlinx-json-jvm:2.2.4")
+
+    implementation("io.insert-koin:koin-core:3.3.3")
+    implementation("io.insert-koin:koin-ktor:3.3.1")
+    implementation("io.insert-koin:koin-logger-slf4j:3.3.0")
+    implementation("io.ktor:ktor-server-call-logging:2.2.4")
+
+}
+
+
+testing {
+    suites {
+        // Configure the built-in test suite
+        val test by getting(JvmTestSuite::class) {
+            // Use JUnit Jupiter test framework
+            useJUnitJupiter("5.11.3")
+        }
+    }
 }
 
 // Apply a specific Java toolchain to ease working on different environments.
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(8)
     }
 }
 
 application {
     // Define the main class for the application.
-    mainClass = "org.example.AppKt"
-}
-
-tasks.named<Test>("test") {
-    // Use JUnit Platform for unit tests.
-    useJUnitPlatform()
+    mainClass = "com.mad.profile.ApplicationKt"
 }
