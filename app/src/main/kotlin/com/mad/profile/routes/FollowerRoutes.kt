@@ -55,7 +55,6 @@ fun Routing.configureFollowerRoutes() {
      *
      * Тело запроса - JSON с 2 id (follower_id и followee_id). В строке запроса так же указан id
      *
-     *
      * Возможные ответы:
      * - 204 No Content: отписка успешно выполнена
      * - 400 Bad Request: несоответствие ID
@@ -96,7 +95,6 @@ fun Routing.configureFollowerRoutes() {
      * Получить список подписок пользователя.
      *
      * В строке запроса ID пользователя и параметры пагинации (page и page_size).
-     *
      *
      * Возможные ответы:
      * - 200 OK: список подписок

@@ -29,28 +29,23 @@ class ProfileAction(config: ApplicationConfig) : IProfileAction {
 
   private val http = HttpClient { install(ContentNegotiation) { json() } }
 
-  /**
-   * Преобразует объект [UserProfile] в Map для сохранения в базе данных
-   */
-  private fun UserProfile.toDbMap() =
-      buildMap {
-        put("id", id)
-        put("name", name)
-        put("email", email)
-        put("image_id", image_id ?: "")
-        put("bio", bio ?: "")
-        location?.let {
-          put("country", it.country)
-          put("city", it.city)
-        }
-        put("birthdate", "%04d-%02d-%02d".format(birthdate.year, birthdate.month, birthdate.day))
-        weight?.let { put("weight", it.toString()) }
-        height?.let { put("height", it.toString()) }
-      }
+  /** Преобразует объект [UserProfile] в Map для сохранения в базе данных */
+  private fun UserProfile.toDbMap() = buildMap {
+    put("id", id)
+    put("name", name)
+    put("email", email)
+    put("image_id", image_id ?: "")
+    put("bio", bio ?: "")
+    location?.let {
+      put("country", it.country)
+      put("city", it.city)
+    }
+    put("birthdate", "%04d-%02d-%02d".format(birthdate.year, birthdate.month, birthdate.day))
+    weight?.let { put("weight", it.toString()) }
+    height?.let { put("height", it.toString()) }
+  }
 
-  /**
-   * Преобразует объект [DbProfileRow] в объект [UserProfile]
-   */
+  /** Преобразует объект [DbProfileRow] в объект [UserProfile] */
   private fun DbProfileRow.toUserProfile(fCnt: Int, gCnt: Int) =
       UserProfile(
           id = id,
@@ -193,9 +188,7 @@ class ProfileAction(config: ApplicationConfig) : IProfileAction {
     return row.toUserProfile(followerCount(row.id), followingCount(row.id))
   }
 
-  /**
-   * Выполняет запрос к базе данных для получения списка записей
-   */
+  /** Выполняет запрос к базе данных для получения списка записей */
   private suspend inline fun <reified R> callRead(
       table: String,
       filters: Map<String, String>? = null

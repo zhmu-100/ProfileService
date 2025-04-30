@@ -46,7 +46,5 @@ import kotlinx.serialization.Serializable
  */
 @Serializable data class ListFollowingResponse(val following_ids: List<String>)
 
-/**
- * Ответ - ошибка
- */
+/** Ответ - ошибка */
 @Serializable data class ErrorResponse(val error: String, val message: String)
