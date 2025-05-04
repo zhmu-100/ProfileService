@@ -2,6 +2,7 @@ package com.mad.profile.actions
 
 import com.mad.feed.dto.*
 import com.mad.profile.dto.*
+import com.mad.profile.logging.LoggerProvider
 import com.mad.profile.model.*
 import io.github.cdimascio.dotenv.dotenv
 import io.ktor.client.*
@@ -19,7 +20,7 @@ import kotlinx.coroutines.withContext
  * @see IProfileAction
  */
 class ProfileAction : IProfileAction {
-
+  private val logger = LoggerProvider.logger
   private val dotenv = dotenv()
   private val dbMode = dotenv["DB_MODE"] ?: "LOCAL"
   private val dbHost = dotenv["DB_HOST"] ?: "localhost"
@@ -77,16 +78,40 @@ class ProfileAction : IProfileAction {
    */
   override suspend fun create(profile: UserProfile): UserProfile =
       withContext(Dispatchers.IO) {
-        val req = DbCreateRequest("profiles", profile.toDbMap())
-        val resp: DbResponse =
-            http
-                .post("$baseUrl/create") {
-                  contentType(ContentType.Application.Json)
-                  setBody(req)
-                }
-                .body()
-        require(resp.success == true) { "DB create failed: ${resp.error}" }
-        profile
+        logger.logActivity(
+            "Создание профиля пользователя",
+            additionalData =
+                mapOf("id" to profile.id, "email" to profile.email, "name" to profile.name))
+
+        try {
+          val req = DbCreateRequest("profiles", profile.toDbMap())
+          val resp: DbResponse =
+              http
+                  .post("$baseUrl/create") {
+                    contentType(ContentType.Application.Json)
+                    setBody(req)
+                  }
+                  .body()
+
+          if (resp.success != true) {
+            logger.logError(
+                "Ошибка при создании профиля: id=${profile.id}, email=${profile.email}",
+                errorMessage = resp.error ?: "Неизвестная ошибка")
+            error("DB create failed: ${resp.error}")
+          }
+
+          logger.logActivity(
+              "Профиль пользователя успешно создан",
+              additionalData = mapOf("id" to profile.id, "email" to profile.email))
+
+          profile
+        } catch (e: Exception) {
+          logger.logError(
+              "Исключение при создании профиля: id=${profile.id}, email=${profile.email}",
+              errorMessage = e.message ?: "Неизвестная ошибка",
+              stackTrace = e.stackTraceToString())
+          throw e
+        }
       }
 
   /**
@@ -95,7 +120,29 @@ class ProfileAction : IProfileAction {
    * @param id ID профиля
    * @return объект [UserProfile] или null, если профиль не найден
    */
-  override suspend fun get(id: String): UserProfile? = fetchOne(mapOf("id" to id))
+  override suspend fun get(id: String): UserProfile? {
+    logger.logActivity("Получение профиля по ID", additionalData = mapOf("id" to id))
+
+    try {
+      val profile = fetchOne(mapOf("id" to id))
+
+      if (profile == null) {
+        logger.logActivity("Профиль не найден", additionalData = mapOf("id" to id))
+      } else {
+        logger.logActivity(
+            "Профиль успешно получен",
+            additionalData = mapOf("id" to id, "email" to profile.email, "name" to profile.name))
+      }
+
+      return profile
+    } catch (e: Exception) {
+      logger.logError(
+          "Ошибка при получении профиля: id=$id",
+          errorMessage = e.message ?: "Неизвестная ошибка",
+          stackTrace = e.stackTraceToString())
+      throw e
+    }
+  }
 
   /**
    * Получает профиль пользователя по email
@@ -103,7 +150,29 @@ class ProfileAction : IProfileAction {
    * @param email email профиля
    * @return объект [UserProfile] или null, если профиль не найден
    */
-  override suspend fun getByEmail(email: String): UserProfile? = fetchOne(mapOf("email" to email))
+  override suspend fun getByEmail(email: String): UserProfile? {
+    logger.logActivity("Получение профиля по email", additionalData = mapOf("email" to email))
+
+    try {
+      val profile = fetchOne(mapOf("email" to email))
+
+      if (profile == null) {
+        logger.logActivity("Профиль не найден по email", additionalData = mapOf("email" to email))
+      } else {
+        logger.logActivity(
+            "Профиль успешно получен по email",
+            additionalData = mapOf("id" to profile.id, "email" to email, "name" to profile.name))
+      }
+
+      return profile
+    } catch (e: Exception) {
+      logger.logError(
+          "Ошибка при получении профиля по email: email=$email",
+          errorMessage = e.message ?: "Неизвестная ошибка",
+          stackTrace = e.stackTraceToString())
+      throw e
+    }
+  }
 
   /**
    * Получает список профилей пользователей
@@ -114,9 +183,31 @@ class ProfileAction : IProfileAction {
    */
   override suspend fun list(page: Int, pageSize: Int): List<UserProfile> =
       withContext(Dispatchers.IO) {
-        val rows = callRead<DbProfileRow>("profiles", null).sortedBy { it.name }
-        rows.drop((page - 1) * pageSize).take(pageSize).map {
-          it.toUserProfile(followerCount(it.id), followingCount(it.id))
+        logger.logActivity(
+            "Получение списка профилей",
+            additionalData = mapOf("page" to page.toString(), "pageSize" to pageSize.toString()))
+
+        try {
+          val rows = callRead<DbProfileRow>("profiles", null).sortedBy { it.name }
+          val profiles =
+              rows.drop((page - 1) * pageSize).take(pageSize).map {
+                it.toUserProfile(followerCount(it.id), followingCount(it.id))
+              }
+
+          logger.logActivity(
+              "Список профилей успешно получен",
+              additionalData =
+                  mapOf(
+                      "totalProfiles" to rows.size.toString(),
+                      "returnedProfiles" to profiles.size.toString()))
+
+          profiles
+        } catch (e: Exception) {
+          logger.logError(
+              "Ошибка при получении списка профилей: page=$page, pageSize=$pageSize",
+              errorMessage = e.message ?: "Неизвестная ошибка",
+              stackTrace = e.stackTraceToString())
+          throw e
         }
       }
 
@@ -128,20 +219,47 @@ class ProfileAction : IProfileAction {
    */
   override suspend fun update(profile: UserProfile): UserProfile? =
       withContext(Dispatchers.IO) {
-        val req =
-            DbUpdateRequest(
-                table = "profiles",
-                data = profile.toDbMap(),
-                condition = "id = ?",
-                conditionParams = listOf(profile.id))
-        val resp: DbResponse =
-            http
-                .put("$baseUrl/update") {
-                  contentType(ContentType.Application.Json)
-                  setBody(req)
-                }
-                .body()
-        if (resp.success != true) null else get(profile.id)
+        logger.logActivity(
+            "Обновление профиля пользователя",
+            additionalData =
+                mapOf("id" to profile.id, "email" to profile.email, "name" to profile.name))
+
+        try {
+          val req =
+              DbUpdateRequest(
+                  table = "profiles",
+                  data = profile.toDbMap(),
+                  condition = "id = ?",
+                  conditionParams = listOf(profile.id))
+
+          val resp: DbResponse =
+              http
+                  .put("$baseUrl/update") {
+                    contentType(ContentType.Application.Json)
+                    setBody(req)
+                  }
+                  .body()
+
+          if (resp.success != true) {
+            logger.logActivity(
+                "Профиль не найден при обновлении", additionalData = mapOf("id" to profile.id))
+            return@withContext null
+          }
+
+          val updatedProfile = get(profile.id)
+
+          logger.logActivity(
+              "Профиль пользователя успешно обновлен",
+              additionalData = mapOf("id" to profile.id, "email" to profile.email))
+
+          updatedProfile
+        } catch (e: Exception) {
+          logger.logError(
+              "Ошибка при обновлении профиля: id=${profile.id}, email=${profile.email}",
+              errorMessage = e.message ?: "Неизвестная ошибка",
+              stackTrace = e.stackTraceToString())
+          throw e
+        }
       }
 
   /**
@@ -152,15 +270,35 @@ class ProfileAction : IProfileAction {
    */
   override suspend fun delete(id: String): Boolean =
       withContext(Dispatchers.IO) {
-        val req = DbDeleteRequest("profiles", "id = ?", listOf(id))
-        val resp: DbResponse =
-            http
-                .delete("$baseUrl/delete") {
-                  contentType(ContentType.Application.Json)
-                  setBody(req)
-                }
-                .body()
-        resp.success == true
+        logger.logActivity("Удаление профиля пользователя", additionalData = mapOf("id" to id))
+
+        try {
+          val req = DbDeleteRequest("profiles", "id = ?", listOf(id))
+          val resp: DbResponse =
+              http
+                  .delete("$baseUrl/delete") {
+                    contentType(ContentType.Application.Json)
+                    setBody(req)
+                  }
+                  .body()
+
+          val success = resp.success == true
+
+          if (success) {
+            logger.logActivity(
+                "Профиль пользователя успешно удален", additionalData = mapOf("id" to id))
+          } else {
+            logger.logActivity("Профиль не найден при удалении", additionalData = mapOf("id" to id))
+          }
+
+          success
+        } catch (e: Exception) {
+          logger.logError(
+              "Ошибка при удалении профиля: id=$id",
+              errorMessage = e.message ?: "Неизвестная ошибка",
+              stackTrace = e.stackTraceToString())
+          throw e
+        }
       }
 
   /**
@@ -169,8 +307,26 @@ class ProfileAction : IProfileAction {
    * @param userId ID пользователя
    * @return количество подписчиков
    */
-  override suspend fun followerCount(userId: String): Int =
-      callRead<DbFollowerRow>("followers", mapOf("followee_id" to userId)).size
+  override suspend fun followerCount(userId: String): Int {
+    logger.logActivity(
+        "Получение количества подписчиков", additionalData = mapOf("userId" to userId))
+
+    try {
+      val count = callRead<DbFollowerRow>("followers", mapOf("followee_id" to userId)).size
+
+      logger.logActivity(
+          "Количество подписчиков получено",
+          additionalData = mapOf("userId" to userId, "followerCount" to count.toString()))
+
+      return count
+    } catch (e: Exception) {
+      logger.logError(
+          "Ошибка при получении количества подписчиков: userId=$userId",
+          errorMessage = e.message ?: "Неизвестная ошибка",
+          stackTrace = e.stackTraceToString())
+      throw e
+    }
+  }
 
   /**
    * Получает количество подписок пользователя
@@ -178,8 +334,25 @@ class ProfileAction : IProfileAction {
    * @param userId ID пользователя
    * @return количество подписок
    */
-  override suspend fun followingCount(userId: String): Int =
-      callRead<DbFollowerRow>("followers", mapOf("follower_id" to userId)).size
+  override suspend fun followingCount(userId: String): Int {
+    logger.logActivity("Получение количества подписок", additionalData = mapOf("userId" to userId))
+
+    try {
+      val count = callRead<DbFollowerRow>("followers", mapOf("follower_id" to userId)).size
+
+      logger.logActivity(
+          "Количество подписок получено",
+          additionalData = mapOf("userId" to userId, "followingCount" to count.toString()))
+
+      return count
+    } catch (e: Exception) {
+      logger.logError(
+          "Ошибка при получении количества подписок: userId=$userId",
+          errorMessage = e.message ?: "Неизвестная ошибка",
+          stackTrace = e.stackTraceToString())
+      throw e
+    }
+  }
 
   /**
    * Получает профиль пользователя по фильтрам
@@ -188,19 +361,67 @@ class ProfileAction : IProfileAction {
    * @return объект [UserProfile] или null, если профиль не найден
    */
   private suspend fun fetchOne(filters: Map<String, String>): UserProfile? {
-    val row = callRead<DbProfileRow>("profiles", filters).firstOrNull() ?: return null
-    return row.toUserProfile(followerCount(row.id), followingCount(row.id))
+    logger.logActivity(
+        "Поиск профиля по фильтрам", additionalData = mapOf("filters" to filters.toString()))
+
+    try {
+      val row = callRead<DbProfileRow>("profiles", filters).firstOrNull()
+
+      if (row == null) {
+        logger.logActivity(
+            "Профиль не найден по фильтрам",
+            additionalData = mapOf("filters" to filters.toString()))
+        return null
+      }
+
+      val followerCnt = followerCount(row.id)
+      val followingCnt = followingCount(row.id)
+      val profile = row.toUserProfile(followerCnt, followingCnt)
+
+      logger.logActivity(
+          "Профиль найден по фильтрам",
+          additionalData =
+              mapOf("id" to profile.id, "email" to profile.email, "name" to profile.name))
+
+      return profile
+    } catch (e: Exception) {
+      logger.logError(
+          "Ошибка при поиске профиля по фильтрам: filters=$filters",
+          errorMessage = e.message ?: "Неизвестная ошибка",
+          stackTrace = e.stackTraceToString())
+      throw e
+    }
   }
 
   /** Выполняет запрос к базе данных для получения списка записей */
   private suspend inline fun <reified R> callRead(
       table: String,
       filters: Map<String, String>? = null
-  ): List<R> =
-      http
-          .post("$baseUrl/read") {
-            contentType(ContentType.Application.Json)
-            setBody(DbReadRequest(table = table, filters = filters))
-          }
-          .body()
+  ): List<R> {
+    logger.logActivity(
+        "Запрос к БД: чтение данных",
+        additionalData = mapOf("table" to table, "filters" to (filters?.toString() ?: "null")))
+
+    try {
+      val result =
+          http
+              .post("$baseUrl/read") {
+                contentType(ContentType.Application.Json)
+                setBody(DbReadRequest(table = table, filters = filters))
+              }
+              .body<List<R>>()
+
+      logger.logActivity(
+          "Данные из БД получены успешно",
+          additionalData = mapOf("table" to table, "rowsCount" to result.size.toString()))
+
+      return result
+    } catch (e: Exception) {
+      logger.logError(
+          "Ошибка при чтении данных из БД: table=$table, filters=${filters?.toString() ?: "null"}",
+          errorMessage = e.message ?: "Неизвестная ошибка",
+          stackTrace = e.stackTraceToString())
+      throw e
+    }
+  }
 }
