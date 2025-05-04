@@ -1,5 +1,6 @@
 package com.mad.profile.routes
 
+import com.mad.profile.logging.LoggerProvider
 import com.mad.profile.model.*
 import com.mad.profile.service.ProfileService
 import io.ktor.http.*
@@ -23,6 +24,7 @@ import org.koin.ktor.ext.inject
  */
 fun Routing.configureProfileRoutes() {
   val profileService: ProfileService by inject()
+  val logger = LoggerProvider.logger
 
   route("/profiles") {
 
@@ -32,20 +34,50 @@ fun Routing.configureProfileRoutes() {
      * В теле запроса - профиль в формате JSON.
      */
     post {
-      val profileRequest = call.receive<CreateProfileRequest>()
+      logger.logActivity("API: Запрос на создание профиля")
 
-      if (profileRequest.profile.name.isBlank()) {
-        return@post call.respond(
-            HttpStatusCode.BadRequest, ErrorResponse("validation_error", "Name cannot be empty"))
+      try {
+        val profileRequest = call.receive<CreateProfileRequest>()
+
+        logger.logActivity(
+            "API: Получены данные профиля",
+            additionalData =
+                mapOf(
+                    "name" to profileRequest.profile.name, "email" to profileRequest.profile.email))
+
+        if (profileRequest.profile.name.isBlank()) {
+          logger.logActivity(
+              "API: Ошибка валидации - пустое имя",
+              additionalData = mapOf("email" to profileRequest.profile.email))
+          call.respond(
+              HttpStatusCode.BadRequest, ErrorResponse("validation_error", "Name cannot be empty"))
+          return@post
+        }
+
+        if (!isValidEmail(profileRequest.profile.email)) {
+          logger.logActivity(
+              "API: Ошибка валидации - некорректный email",
+              additionalData = mapOf("email" to profileRequest.profile.email))
+          call.respond(
+              HttpStatusCode.BadRequest, ErrorResponse("validation_error", "Invalid email format"))
+          return@post
+        }
+
+        val created = profileService.createProfile(profileRequest)
+
+        logger.logActivity(
+            "API: Профиль успешно создан",
+            additionalData =
+                mapOf("id" to created.id, "email" to created.email, "name" to created.name))
+
+        call.respond(HttpStatusCode.Created, created)
+      } catch (e: Exception) {
+        logger.logError(
+            "API: Исключение при создании профиля",
+            errorMessage = e.message ?: "Неизвестная ошибка",
+            stackTrace = e.stackTraceToString())
+        throw e
       }
-
-      if (!isValidEmail(profileRequest.profile.email)) {
-        return@post call.respond(
-            HttpStatusCode.BadRequest, ErrorResponse("validation_error", "Invalid email format"))
-      }
-
-      val created = profileService.createProfile(profileRequest)
-      call.respond(HttpStatusCode.Created, created)
     }
 
     /**
@@ -54,18 +86,37 @@ fun Routing.configureProfileRoutes() {
      * В url ид профиля
      */
     get("/{id}") {
-      val id =
-          call.parameters["id"]
-              ?: return@get call.respond(
-                  HttpStatusCode.BadRequest,
-                  ErrorResponse("invalid_id", "Missing id"),
-              )
+      val id = call.parameters["id"]
 
-      val profile = profileService.getProfile(id)
-      if (profile == null) {
-        call.respond(HttpStatusCode.NotFound, ErrorResponse("not_found", "Profile not found"))
-      } else {
-        call.respond(profile)
+      if (id == null) {
+        logger.logActivity("API: Ошибка запроса на получение профиля - отсутствует ID")
+        call.respond(
+            HttpStatusCode.BadRequest,
+            ErrorResponse("invalid_id", "Missing id"),
+        )
+        return@get
+      }
+
+      logger.logActivity("API: Запрос на получение профиля", additionalData = mapOf("id" to id))
+
+      try {
+        val profile = profileService.getProfile(id)
+
+        if (profile == null) {
+          logger.logActivity("API: Профиль не найден", additionalData = mapOf("id" to id))
+          call.respond(HttpStatusCode.NotFound, ErrorResponse("not_found", "Profile not found"))
+        } else {
+          logger.logActivity(
+              "API: Профиль успешно получен",
+              additionalData = mapOf("id" to id, "email" to profile.email, "name" to profile.name))
+          call.respond(profile)
+        }
+      } catch (e: Exception) {
+        logger.logError(
+            "API: Исключение при получении профиля: id=$id",
+            errorMessage = e.message ?: "Неизвестная ошибка",
+            stackTrace = e.stackTraceToString())
+        throw e
       }
     }
 
@@ -75,23 +126,55 @@ fun Routing.configureProfileRoutes() {
      * В теле - JSON с обновленным профилем.
      */
     put("/{id}") {
-      val id =
-          call.parameters["id"]
-              ?: return@put call.respond(
-                  HttpStatusCode.BadRequest, ErrorResponse("invalid_id", "Missing profile id"))
+      val id = call.parameters["id"]
 
-      val req = call.receive<UpdateProfileRequest>()
-
-      if (req.profile.id != id) {
-        return@put call.respond(
-            HttpStatusCode.BadRequest, ErrorResponse("mismatch_id", "ID in path and body differ"))
+      if (id == null) {
+        logger.logActivity("API: Ошибка запроса на обновление профиля - отсутствует ID")
+        call.respond(HttpStatusCode.BadRequest, ErrorResponse("invalid_id", "Missing profile id"))
+        return@put
       }
 
-      val updated = profileService.updateProfile(req)
-      if (updated == null) {
-        call.respond(HttpStatusCode.NotFound, ErrorResponse("not_found", "Profile not found"))
-      } else {
-        call.respond(updated)
+      logger.logActivity("API: Запрос на обновление профиля", additionalData = mapOf("id" to id))
+
+      try {
+        val req = call.receive<UpdateProfileRequest>()
+
+        logger.logActivity(
+            "API: Получены данные для обновления профиля",
+            additionalData =
+                mapOf(
+                    "id" to id,
+                    "profileId" to req.profile.id,
+                    "email" to req.profile.email,
+                    "name" to req.profile.name))
+
+        if (req.profile.id != id) {
+          logger.logActivity(
+              "API: Несоответствие ID при обновлении профиля",
+              additionalData = mapOf("pathId" to id, "bodyId" to req.profile.id))
+          call.respond(
+              HttpStatusCode.BadRequest, ErrorResponse("mismatch_id", "ID in path and body differ"))
+          return@put
+        }
+
+        val updated = profileService.updateProfile(req)
+
+        if (updated == null) {
+          logger.logActivity(
+              "API: Профиль не найден при обновлении", additionalData = mapOf("id" to id))
+          call.respond(HttpStatusCode.NotFound, ErrorResponse("not_found", "Profile not found"))
+        } else {
+          logger.logActivity(
+              "API: Профиль успешно обновлен",
+              additionalData = mapOf("id" to id, "email" to updated.email, "name" to updated.name))
+          call.respond(updated)
+        }
+      } catch (e: Exception) {
+        logger.logError(
+            "API: Исключение при обновлении профиля: id=$id",
+            errorMessage = e.message ?: "Неизвестная ошибка",
+            stackTrace = e.stackTraceToString())
+        throw e
       }
     }
 
@@ -101,15 +184,33 @@ fun Routing.configureProfileRoutes() {
      * В пути запроса id профиля
      */
     delete("/{id}") {
-      val id =
-          call.parameters["id"]
-              ?: return@delete call.respond(
-                  HttpStatusCode.BadRequest, ErrorResponse("invalid_id", "Missing profile id"))
+      val id = call.parameters["id"]
 
-      if (profileService.deleteProfile(id)) {
-        call.respond(HttpStatusCode.NoContent)
-      } else {
-        call.respond(HttpStatusCode.NotFound, ErrorResponse("not_found", "Profile not found"))
+      if (id == null) {
+        logger.logActivity("API: Ошибка запроса на удаление профиля - отсутствует ID")
+        call.respond(HttpStatusCode.BadRequest, ErrorResponse("invalid_id", "Missing profile id"))
+        return@delete
+      }
+
+      logger.logActivity("API: Запрос на удаление профиля", additionalData = mapOf("id" to id))
+
+      try {
+        val success = profileService.deleteProfile(id)
+
+        if (success) {
+          logger.logActivity("API: Профиль успешно удален", additionalData = mapOf("id" to id))
+          call.respond(HttpStatusCode.NoContent)
+        } else {
+          logger.logActivity(
+              "API: Профиль не найден при удалении", additionalData = mapOf("id" to id))
+          call.respond(HttpStatusCode.NotFound, ErrorResponse("not_found", "Profile not found"))
+        }
+      } catch (e: Exception) {
+        logger.logError(
+            "API: Исключение при удалении профиля: id=$id",
+            errorMessage = e.message ?: "Неизвестная ошибка",
+            stackTrace = e.stackTraceToString())
+        throw e
       }
     }
 
@@ -128,14 +229,39 @@ fun Routing.configureProfileRoutes() {
       val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
       val pageSize = call.request.queryParameters["pageSize"]?.toIntOrNull() ?: 10
 
-      if (page < 1 || pageSize < 1 || pageSize > 100) {
-        return@get call.respond(
-            HttpStatusCode.BadRequest,
-            ErrorResponse("invalid_pagination", "Invalid pagination parameters"))
-      }
+      logger.logActivity(
+          "API: Запрос на получение списка профилей",
+          additionalData = mapOf("page" to page.toString(), "pageSize" to pageSize.toString()))
 
-      val result = profileService.listProfiles(page, pageSize)
-      call.respond(result)
+      try {
+        if (page < 1 || pageSize < 1 || pageSize > 100) {
+          logger.logActivity(
+              "API: Некорректные параметры пагинации",
+              additionalData = mapOf("page" to page.toString(), "pageSize" to pageSize.toString()))
+          call.respond(
+              HttpStatusCode.BadRequest,
+              ErrorResponse("invalid_pagination", "Invalid pagination parameters"))
+          return@get
+        }
+
+        val result = profileService.listProfiles(page, pageSize)
+
+        logger.logActivity(
+            "API: Список профилей успешно получен",
+            additionalData =
+                mapOf(
+                    "page" to page.toString(),
+                    "pageSize" to pageSize.toString(),
+                    "profilesCount" to result.size.toString()))
+
+        call.respond(result)
+      } catch (e: Exception) {
+        logger.logError(
+            "API: Исключение при получении списка профилей: page=$page, pageSize=$pageSize",
+            errorMessage = e.message ?: "Неизвестная ошибка",
+            stackTrace = e.stackTraceToString())
+        throw e
+      }
     }
   }
 }

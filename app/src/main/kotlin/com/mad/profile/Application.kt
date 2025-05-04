@@ -1,6 +1,7 @@
 package com.mad.profile
 
 import com.mad.profile.config.configureDependencyInjection
+import com.mad.profile.logging.LoggerProvider
 import com.mad.profile.routes.configureFollowerRoutes
 import com.mad.profile.routes.configureProfileRoutes
 import io.github.cdimascio.dotenv.dotenv
@@ -14,10 +15,26 @@ import kotlinx.serialization.json.Json
 
 /** Точка входа в приложение Profile Service. Запускает встроенный Netty сервер */
 fun main() {
+  val logger = LoggerProvider.logger
   val dotenv = dotenv()
   val port = dotenv["PORT"]?.toIntOrNull() ?: 8002
-  embeddedServer(Netty, port = port, host = "0.0.0.0", module = Application::configureServer)
-      .start(wait = true)
+
+  logger.logActivity(
+      "Запуск Profile Service",
+      additionalData = mapOf("port" to port.toString(), "host" to "0.0.0.0"))
+
+  try {
+    embeddedServer(Netty, port = port, host = "0.0.0.0", module = Application::configureServer)
+        .start(wait = true)
+
+    logger.logActivity("Profile Service успешно запущен")
+  } catch (e: Exception) {
+    logger.logError(
+        "Ошибка при запуске Profile Service",
+        errorMessage = e.message ?: "Неизвестная ошибка",
+        stackTrace = e.stackTraceToString())
+    throw e
+  }
 }
 
 /**
@@ -31,20 +48,44 @@ fun main() {
  * 5. Регистрирует все маршруты приложения
  */
 fun Application.configureServer() {
+  val logger = LoggerProvider.logger
 
-  configureDependencyInjection()
+  logger.logActivity("Настройка модулей приложения")
 
-  install(ContentNegotiation) {
-    json(
-        Json {
-          prettyPrint = true
-          isLenient = true
-          ignoreUnknownKeys = true
-        })
-  }
+  try {
+    configureDependencyInjection()
 
-  routing {
-    configureProfileRoutes()
-    configureFollowerRoutes()
+    logger.logActivity("Dependency injection настроен")
+
+    install(ContentNegotiation) {
+      json(
+          Json {
+            prettyPrint = true
+            isLenient = true
+            ignoreUnknownKeys = true
+          })
+    }
+
+    logger.logActivity("Content negotiation настроен")
+
+    routing {
+      configureProfileRoutes()
+      configureFollowerRoutes()
+    }
+
+    logger.logActivity("Маршруты настроены")
+
+    environment.monitor.subscribe(ApplicationStopped) {
+      logger.logActivity("Остановка Profile Service")
+      logger.close()
+    }
+
+    logger.logActivity("Модули приложения успешно настроены")
+  } catch (e: Exception) {
+    logger.logError(
+        "Ошибка при настройке модулей приложения",
+        errorMessage = e.message ?: "Неизвестная ошибка",
+        stackTrace = e.stackTraceToString())
+    throw e
   }
 }
