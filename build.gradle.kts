@@ -22,7 +22,6 @@ repositories {
 }
 
 dependencies {
-    implementation(libs.guava)
     implementation("io.ktor:ktor-server-core-jvm:2.2.4")
     implementation("io.ktor:ktor-server-netty-jvm:2.2.4")
     implementation("ch.qos.logback:logback-classic:1.2.11")
