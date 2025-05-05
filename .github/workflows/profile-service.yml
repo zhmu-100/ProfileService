@@ -1,4 +1,4 @@
-name: Profile-service Service CI/CD
+name: profile-service Service CI/CD
 
 on:
   push:
@@ -32,10 +32,10 @@ jobs:
         run: |
           if [[ "${{ needs.call-service-template.result }}" == "success" ]]; then
             echo "success=true" >> $GITHUB_OUTPUT
-            echo "message=Profile-service service deployment completed successfully" >> $GITHUB_OUTPUT
+            echo "message=profile-service service deployment completed successfully" >> $GITHUB_OUTPUT
           else
             echo "success=false" >> $GITHUB_OUTPUT
-            echo "message=Profile-service service deployment failed" >> $GITHUB_OUTPUT
+            echo "message=profile-service service deployment failed" >> $GITHUB_OUTPUT
           fi
 
       - name: Send notification
@@ -45,6 +45,6 @@ jobs:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_CHANNEL: deployments
           SLACK_COLOR: ${{ steps.status.outputs.success == 'true' && 'good' || 'danger' }}
-          SLACK_TITLE: Profile-service Service Deployment
+          SLACK_TITLE: profile-service Service Deployment
           SLACK_MESSAGE: ${{ steps.status.outputs.message }}
           SLACK_FOOTER: "Sport Activity Tracking App CI/CD"
