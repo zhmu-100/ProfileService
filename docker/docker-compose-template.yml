@@ -1,23 +1,23 @@
 services:
   app:
-    image: ${REGISTRY:-localhost}/${SERVICE_NAME:-db-service}:${SERVICE_VERSION:-latest}
-    container_name: ${SERVICE_NAME:-db-service}
+    image: ${REGISTRY:-localhost}/${SERVICE_NAME:-profile-service}:${SERVICE_VERSION:-latest}
+    container_name: ${SERVICE_NAME:-profile-service}
     restart: always
     environment:
       - SERVICE_ENV=${DEPLOYMENT_ENV:-development}
       - JAVA_OPTS=-Xmx512m -Xms256m
       # Additional environment variables will be loaded from env file
     env_file:
-      - ./${SERVICE_NAME:-db-service}.env
+      - ./${SERVICE_NAME:-profile-service}.env
     ports:
       - "${PORT:-8080}:8080"
     volumes:
       - app-data:/app/data
       - app-logs:/app/logs
-      # - ./config/${DEPLOYMENT_ENV:-development}/${SERVICE_NAME:-db-service}.conf:/app/config/application.conf
+      # - ./config/${DEPLOYMENT_ENV:-development}/${SERVICE_NAME:-profile-service}.conf:/app/config/application.conf
       # - ./${SERVICE_NAME}.conf:/app/config/application.conf
-      - ./${SERVICE_NAME:-db-service}.env:/app/.env
-      - ./${SERVICE_NAME:-db-service}.env:/.env
+      - ./${SERVICE_NAME:-profile-service}.env:/app/.env
+      - ./${SERVICE_NAME:-profile-service}.env:/.env
     networks:
       - app-network
     healthcheck:
@@ -44,6 +44,6 @@ networks:
 
 volumes:
   app-data:
-    name: ${SERVICE_NAME:-db-service}-data-${DEPLOYMENT_ENV:-development}
+    name: ${SERVICE_NAME:-profile-service}-data-${DEPLOYMENT_ENV:-development}
   app-logs:
-    name: ${SERVICE_NAME:-db-service}-logs-${DEPLOYMENT_ENV:-development}
+    name: ${SERVICE_NAME:-profile-service}-logs-${DEPLOYMENT_ENV:-development}
