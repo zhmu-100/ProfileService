@@ -10,7 +10,7 @@ services:
     env_file:
       - ./${SERVICE_NAME:-profile-service}.env
     ports:
-      - "${PORT:-8080}:8080"
+      - "${PORT:-8083}:8083"
     volumes:
       - app-data:/app/data
       - app-logs:/app/logs
