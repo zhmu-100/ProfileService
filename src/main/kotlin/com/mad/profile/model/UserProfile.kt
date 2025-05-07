@@ -23,6 +23,7 @@ import kotlinx.serialization.Serializable
  * Модель профиля пользователя
  *
  * @property id ID профиля
+ * @property user_id ID пользователя
  * @property name Имя пользователя
  * @property email Email пользователя
  * @property image_id ID изображения профиля
@@ -37,6 +38,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class UserProfile(
     val id: String,
+    val user_id: String,
     val name: String,
     val email: String,
     val image_id: String? = null,

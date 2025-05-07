@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
  * Строка профиля в БД
  *
  * @property id ID профиля
+ * @property user_id ID пользователя
  * @property name Имя пользователя
  * @property email Email пользователя
  * @property image_id ID изображения профиля
@@ -19,6 +20,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class DbProfileRow(
     val id: String,
+    val user_id: String,
     val name: String,
     val email: String,
     val image_id: String? = null,

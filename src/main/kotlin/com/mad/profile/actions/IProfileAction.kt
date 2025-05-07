@@ -8,6 +8,7 @@ import com.mad.profile.model.UserProfile
  * Возможные опции:
  * - Создать профиль
  * - Получить профиль по ID
+ * - Получить профиль по user_id
  * - Получить профиль по email
  * - Получить список профилей
  * - Обновить профиль
@@ -80,4 +81,12 @@ interface IProfileAction {
    * @return Количество подписок
    */
   suspend fun followingCount(userId: String): Int
+
+  /**
+   * Получить профиль по user_id
+   *
+   * @param userId ID пользователя
+   * @return Профиль пользователя или null, если не найден
+   */
+  suspend fun getByUserId(userId: String): UserProfile?
 }

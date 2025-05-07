@@ -37,6 +37,7 @@ class ProfileAction : IProfileAction {
   /** Преобразует объект [UserProfile] в Map для сохранения в базе данных */
   private fun UserProfile.toDbMap() = buildMap {
     put("id", id)
+    put("user_id", user_id)
     put("name", name)
     put("email", email)
     put("image_id", image_id ?: "")
@@ -54,6 +55,7 @@ class ProfileAction : IProfileAction {
   private fun DbProfileRow.toUserProfile(fCnt: Int, gCnt: Int) =
       UserProfile(
           id = id,
+          user_id = user_id,
           name = name,
           email = email,
           image_id = image_id.takeIf { !it.isNullOrBlank() },
@@ -81,7 +83,11 @@ class ProfileAction : IProfileAction {
         logger.logActivity(
             "Создание профиля пользователя",
             additionalData =
-                mapOf("id" to profile.id, "email" to profile.email, "name" to profile.name))
+                mapOf(
+                    "id" to profile.id,
+                    "user_id" to profile.user_id,
+                    "email" to profile.email,
+                    "name" to profile.name))
 
         try {
           val req = DbCreateRequest("profiles", profile.toDbMap())
@@ -95,19 +101,20 @@ class ProfileAction : IProfileAction {
 
           if (resp.success != true) {
             logger.logError(
-                "Ошибка при создании профиля: id=${profile.id}, email=${profile.email}",
+                "Ошибка при создании профиля: id=${profile.id}, user_id=${profile.user_id}, email=${profile.email}",
                 errorMessage = resp.error ?: "Неизвестная ошибка")
             error("DB create failed: ${resp.error}")
           }
 
           logger.logActivity(
               "Профиль пользователя успешно создан",
-              additionalData = mapOf("id" to profile.id, "email" to profile.email))
+              additionalData =
+                  mapOf("id" to profile.id, "user_id" to profile.user_id, "email" to profile.email))
 
           profile
         } catch (e: Exception) {
           logger.logError(
-              "Исключение при создании профиля: id=${profile.id}, email=${profile.email}",
+              "Исключение при создании профиля: id=${profile.id}, user_id=${profile.user_id}, email=${profile.email}",
               errorMessage = e.message ?: "Неизвестная ошибка",
               stackTrace = e.stackTraceToString())
           throw e
@@ -138,6 +145,42 @@ class ProfileAction : IProfileAction {
     } catch (e: Exception) {
       logger.logError(
           "Ошибка при получении профиля: id=$id",
+          errorMessage = e.message ?: "Неизвестная ошибка",
+          stackTrace = e.stackTraceToString())
+      throw e
+    }
+  }
+
+  /**
+   * Получает профиль пользователя по user_id
+   *
+   * @param userId ID пользователя
+   * @return объект [UserProfile] или null, если профиль не найден
+   */
+  override suspend fun getByUserId(userId: String): UserProfile? {
+    logger.logActivity("Получение профиля по user_id", additionalData = mapOf("user_id" to userId))
+
+    try {
+      val profile = fetchOne(mapOf("user_id" to userId))
+
+      if (profile == null) {
+        logger.logActivity(
+            "Профиль не найден по user_id", additionalData = mapOf("user_id" to userId))
+      } else {
+        logger.logActivity(
+            "Профиль успешно получен по user_id",
+            additionalData =
+                mapOf(
+                    "id" to profile.id,
+                    "user_id" to userId,
+                    "email" to profile.email,
+                    "name" to profile.name))
+      }
+
+      return profile
+    } catch (e: Exception) {
+      logger.logError(
+          "Ошибка при получении профиля по user_id: user_id=$userId",
           errorMessage = e.message ?: "Неизвестная ошибка",
           stackTrace = e.stackTraceToString())
       throw e
@@ -222,7 +265,11 @@ class ProfileAction : IProfileAction {
         logger.logActivity(
             "Обновление профиля пользователя",
             additionalData =
-                mapOf("id" to profile.id, "email" to profile.email, "name" to profile.name))
+                mapOf(
+                    "id" to profile.id,
+                    "user_id" to profile.user_id,
+                    "email" to profile.email,
+                    "name" to profile.name))
 
         try {
           val req =
@@ -242,7 +289,8 @@ class ProfileAction : IProfileAction {
 
           if (resp.success != true) {
             logger.logActivity(
-                "Профиль не найден при обновлении", additionalData = mapOf("id" to profile.id))
+                "Профиль не найден при обновлении",
+                additionalData = mapOf("id" to profile.id, "user_id" to profile.user_id))
             return@withContext null
           }
 
@@ -250,12 +298,13 @@ class ProfileAction : IProfileAction {
 
           logger.logActivity(
               "Профиль пользователя успешно обновлен",
-              additionalData = mapOf("id" to profile.id, "email" to profile.email))
+              additionalData =
+                  mapOf("id" to profile.id, "user_id" to profile.user_id, "email" to profile.email))
 
           updatedProfile
         } catch (e: Exception) {
           logger.logError(
-              "Ошибка при обновлении профиля: id=${profile.id}, email=${profile.email}",
+              "Ошибка при обновлении профиля: id=${profile.id}, user_id=${profile.user_id}, email=${profile.email}",
               errorMessage = e.message ?: "Неизвестная ошибка",
               stackTrace = e.stackTraceToString())
           throw e

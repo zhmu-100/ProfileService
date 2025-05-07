@@ -21,7 +21,11 @@ class ProfileService(
   suspend fun createProfile(request: CreateProfileRequest): UserProfile {
     logger.logActivity(
         "Создание профиля пользователя",
-        additionalData = mapOf("email" to request.profile.email, "name" to request.profile.name))
+        additionalData =
+            mapOf(
+                "email" to request.profile.email,
+                "user_id" to request.profile.user_id,
+                "name" to request.profile.name))
 
     try {
       val candidate = request.profile
@@ -30,7 +34,8 @@ class ProfileService(
       profileAction.getByEmail(candidate.email)?.let {
         logger.logActivity(
             "Профиль с таким email уже существует",
-            additionalData = mapOf("email" to candidate.email, "existingId" to it.id))
+            additionalData =
+                mapOf("email" to candidate.email, "existingId" to it.id, "user_id" to it.user_id))
         return it
       }
 
@@ -39,7 +44,11 @@ class ProfileService(
             val newId = java.util.UUID.randomUUID().toString()
             logger.logActivity(
                 "Сгенерирован новый ID для профиля",
-                additionalData = mapOf("email" to candidate.email, "newId" to newId))
+                additionalData =
+                    mapOf(
+                        "email" to candidate.email,
+                        "newId" to newId,
+                        "user_id" to candidate.user_id))
             candidate.copy(id = newId)
           } else candidate
 
@@ -50,13 +59,14 @@ class ProfileService(
           additionalData =
               mapOf(
                   "id" to createdProfile.id,
+                  "user_id" to createdProfile.user_id,
                   "email" to createdProfile.email,
                   "name" to createdProfile.name))
 
       return createdProfile
     } catch (e: Exception) {
       logger.logError(
-          "Ошибка при создании профиля: email=${request.profile.email}",
+          "Ошибка при создании профиля: email=${request.profile.email}, user_id=${request.profile.user_id}",
           errorMessage = e.message ?: "Неизвестная ошибка",
           stackTrace = e.stackTraceToString())
       throw e
@@ -75,13 +85,49 @@ class ProfileService(
       } else {
         logger.logActivity(
             "Профиль успешно получен",
-            additionalData = mapOf("id" to id, "email" to profile.email, "name" to profile.name))
+            additionalData =
+                mapOf(
+                    "id" to id,
+                    "user_id" to profile.user_id,
+                    "email" to profile.email,
+                    "name" to profile.name))
       }
 
       return profile
     } catch (e: Exception) {
       logger.logError(
           "Ошибка при получении профиля: id=$id",
+          errorMessage = e.message ?: "Неизвестная ошибка",
+          stackTrace = e.stackTraceToString())
+      throw e
+    }
+  }
+
+  /** Получить профиль пользователя по user_id */
+  suspend fun getProfileByUserId(userId: String): UserProfile? {
+    logger.logActivity("Получение профиля по user_id", additionalData = mapOf("user_id" to userId))
+
+    try {
+      val profile = profileAction.getByUserId(userId)
+
+      if (profile == null) {
+        logger.logActivity(
+            "Профиль не найден по user_id", additionalData = mapOf("user_id" to userId))
+      } else {
+        logger.logActivity(
+            "Профиль успешно получен по user_id",
+            additionalData =
+                mapOf(
+                    "id" to profile.id,
+                    "user_id" to profile.user_id,
+                    "email" to profile.email,
+                    "name" to profile.name))
+      }
+
+      return profile
+    } catch (e: Exception) {
+      logger.logError(
+          "Ошибка при получении профиля по user_id: user_id=$userId",
           errorMessage = e.message ?: "Неизвестная ошибка",
           stackTrace = e.stackTraceToString())
       throw e
@@ -122,6 +168,7 @@ class ProfileService(
         additionalData =
             mapOf(
                 "id" to request.profile.id,
+                "user_id" to request.profile.user_id,
                 "email" to request.profile.email,
                 "name" to request.profile.name))
 
@@ -130,13 +177,16 @@ class ProfileService(
 
       if (updatedProfile == null) {
         logger.logActivity(
-            "Профиль не найден при обновлении", additionalData = mapOf("id" to request.profile.id))
+            "Профиль не найден при обновлении",
+            additionalData =
+                mapOf("id" to request.profile.id, "user_id" to request.profile.user_id))
       } else {
         logger.logActivity(
             "Профиль успешно обновлен",
             additionalData =
                 mapOf(
                     "id" to updatedProfile.id,
+                    "user_id" to updatedProfile.user_id,
                     "email" to updatedProfile.email,
                     "name" to updatedProfile.name))
       }
@@ -144,7 +194,7 @@ class ProfileService(
       return updatedProfile
     } catch (e: Exception) {
       logger.logError(
-          "Ошибка при обновлении профиля: id=${request.profile.id}",
+          "Ошибка при обновлении профиля: id=${request.profile.id}, user_id=${request.profile.user_id}",
           errorMessage = e.message ?: "Неизвестная ошибка",
           stackTrace = e.stackTraceToString())
       throw e

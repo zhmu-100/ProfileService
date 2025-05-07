@@ -1,5 +1,6 @@
 package com.mad.profile.routes
 
+import com.mad.profile.actions.IProfileAction
 import com.mad.profile.logging.LoggerProvider
 import com.mad.profile.model.*
 import com.mad.profile.service.ProfileService
@@ -16,6 +17,7 @@ import org.koin.ktor.ext.inject
  * Регистрирует следующие endpoints:
  * - POST /profiles - создание профиля
  * - GET /profiles/{id} - получение профиля по ID
+ * - GET /profiles/user/{user_id} - получение профиля по user_id
  * - PUT /profiles/{id} - обновление профиля
  * - DELETE /profiles/{id} - удаление профиля
  * - GET /profiles - список профилей с пагинацией
@@ -24,6 +26,7 @@ import org.koin.ktor.ext.inject
  */
 fun Routing.configureProfileRoutes() {
   val profileService: ProfileService by inject()
+  val profileAction: IProfileAction by inject()
   val logger = LoggerProvider.logger
 
   route("/profiles") {
@@ -114,6 +117,54 @@ fun Routing.configureProfileRoutes() {
       } catch (e: Exception) {
         logger.logError(
             "API: Исключение при получении профиля: id=$id",
+            errorMessage = e.message ?: "Неизвестная ошибка",
+            stackTrace = e.stackTraceToString())
+        throw e
+      }
+    }
+
+    /**
+     * Получение профиля по user_id.
+     *
+     * В URL user_id пользователя
+     */
+    get("/user/{user_id}") {
+      val userId = call.parameters["user_id"]
+
+      if (userId == null) {
+        logger.logActivity("API: Ошибка запроса на получение профиля - отсутствует user_id")
+        call.respond(
+            HttpStatusCode.BadRequest,
+            ErrorResponse("invalid_user_id", "Missing user_id"),
+        )
+        return@get
+      }
+
+      logger.logActivity(
+          "API: Запрос на получение профиля по user_id",
+          additionalData = mapOf("user_id" to userId))
+
+      try {
+        val profile = profileAction.getByUserId(userId)
+
+        if (profile == null) {
+          logger.logActivity(
+              "API: Профиль не найден по user_id", additionalData = mapOf("user_id" to userId))
+          call.respond(HttpStatusCode.NotFound, ErrorResponse("not_found", "Profile not found"))
+        } else {
+          logger.logActivity(
+              "API: Профиль успешно получен по user_id",
+              additionalData =
+                  mapOf(
+                      "id" to profile.id,
+                      "user_id" to userId,
+                      "email" to profile.email,
+                      "name" to profile.name))
+          call.respond(profile)
+        }
+      } catch (e: Exception) {
+        logger.logError(
+            "API: Исключение при получении профиля по user_id: user_id=$userId",
             errorMessage = e.message ?: "Неизвестная ошибка",
             stackTrace = e.stackTraceToString())
         throw e
